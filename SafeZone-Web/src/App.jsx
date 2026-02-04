@@ -10,6 +10,7 @@ import ChannelList from './components/ChannelList';
 import VoiceRoom from './components/VoiceRoom';
 import FriendsDashboard from './components/FriendsDashboard';
 import RoleSettings from './components/RoleSettings';
+import { getTheme, getPalettes, getPaletteName } from './utils/themes';
 
 
 
@@ -121,7 +122,20 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showServerSettings, setShowServerSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState('profile')
-  const [theme, setTheme] = useState(localStorage.getItem('safezone_theme') || 'dark')
+
+  // THEME STATE - { palette: 'midnight'|'ocean'|'forest'|'amber', mode: 'dark'|'light' }
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('safezone_theme');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved theme:', e);
+      }
+    }
+    return { palette: 'midnight', mode: 'dark' };
+  });
+
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editDisplayName, setEditDisplayName] = useState('')
   const [editAvatarColor, setEditAvatarColor] = useState('#5865F2')
@@ -1435,56 +1449,241 @@ function App() {
   }
 
   // --- RENDER HELPERS ---
+  const colors = getTheme(theme.palette, theme.mode);
 
 
   // --- RENDER MAIN ---
   if (!isServerSet) { /* ... */ return (
-    <div style={{ backgroundColor: '#121212', color: '#fff', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '400px', padding: '40px', background: '#1e1e1e', borderRadius: '16px', textAlign: 'center' }}>
-        <h2>Sunucu Bağlantısı</h2>
-        <input type="text" placeholder="IP Adresi" value={serverIp} onChange={e => setServerIp(e.target.value)}
-          style={{ width: '100%', padding: '15px', margin: '20px 0', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '8px', WebkitAppRegion: 'no-drag', cursor: 'text' }} />
-        <button onClick={saveServerIp} style={{ width: '100%', padding: '15px', background: '#007AFF', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', WebkitAppRegion: 'no-drag' }}>Bağlan</button>
+    <div style={{
+      backgroundImage: 'url("https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2670&auto=format&fit=crop")', // Abstract dark background
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      height: '100vh',
+      width: '100vw',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif'
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(5px)' }}></div>
+
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <h1 style={{
+          fontSize: '48px',
+          fontWeight: '900',
+          color: '#fff',
+          marginBottom: '30px',
+          textShadow: '0 0 20px rgba(88, 101, 242, 0.8)',
+          letterSpacing: '2px',
+          fontFamily: '"Inter", sans-serif'
+        }}>
+          SafeZone
+        </h1>
+
+        <div style={{
+          width: '480px',
+          padding: '32px',
+          background: colors.card,
+          borderRadius: '5px',
+          boxShadow: '0 2px 10px 0 rgba(0,0,0,0.2)',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ color: colors.text, marginBottom: '8px', fontSize: '24px', fontWeight: 'bold' }}>Sunucuya Bağlan</h2>
+          <div style={{ color: colors.textSecondary, fontSize: '16px', marginBottom: '20px' }}>Devam etmek için sunucu adresini gir.</div>
+
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+            <label style={{ color: colors.textSecondary, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+              SUNUCU ADRESİ (IP)
+            </label>
+            <input
+              type="text"
+              value={serverIp}
+              onChange={e => setServerIp(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: colors.sidebar,
+                border: '1px solid ' + colors.border,
+                borderRadius: '3px',
+                color: colors.text,
+                outline: 'none',
+                height: '40px',
+                fontSize: '16px',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = colors.accent}
+              onBlur={(e) => e.target.style.borderColor = colors.border}
+            />
+          </div>
+
+          <button onClick={saveServerIp} style={{
+            width: '100%',
+            height: '44px',
+            backgroundColor: colors.accent,
+            color: colors.text,
+            border: 'none',
+            borderRadius: '3px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s'
+          }}
+            onMouseEnter={e => e.target.style.backgroundColor = colors.accentHover}
+            onMouseLeave={e => e.target.style.backgroundColor = colors.accent}
+          >
+            Bağlan
+          </button>
+        </div>
       </div>
     </div>
   )
   }
   if (!authState.token) { /* ... */ return (
-    <div style={{ backgroundColor: '#121212', color: '#fff', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '400px', padding: '40px', background: '#1e1e1e', borderRadius: '16px', textAlign: 'center' }}>
-        <h2>SafeZone Giriş</h2>
-        {authError && <div style={{ color: 'red', marginBottom: '10px' }}>{authError}</div>}
+    <div style={{
+      backgroundImage: 'url("https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2670&auto=format&fit=crop")',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      height: '100vh',
+      width: '100vw',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif'
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(5px)' }}></div>
 
-        <input type="text" placeholder="Kullanıcı Adı" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: '15px', margin: '10px 0', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '8px', WebkitAppRegion: 'no-drag', cursor: 'text' }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <h1 style={{
+          fontSize: '48px',
+          fontWeight: '900',
+          color: '#fff',
+          marginBottom: '30px',
+          textShadow: '0 0 20px rgba(88, 101, 242, 0.8)',
+          letterSpacing: '2px',
+          fontFamily: '"Inter", sans-serif'
+        }}>
+          SafeZone
+        </h1>
 
-        {authMode === 'register' && (
-          <>
-            <input type="text" placeholder="Görünen Ad" value={authInput.display_name} onChange={e => setAuthInput({ ...authInput, display_name: e.target.value })} style={{ width: '100%', padding: '15px', margin: '10px 0', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '8px', WebkitAppRegion: 'no-drag', cursor: 'text' }} />
-            <input type="text" placeholder="Kurtarma PIN (4 haneli)" value={authInput.recovery_pin} onChange={e => setAuthInput({ ...authInput, recovery_pin: e.target.value })} style={{ width: '100%', padding: '15px', margin: '10px 0', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '8px', WebkitAppRegion: 'no-drag', cursor: 'text' }} />
-          </>
-        )}
+        <div style={{
+          width: '480px',
+          padding: '32px',
+          background: colors.card,
+          borderRadius: '5px',
+          boxShadow: '0 2px 10px 0 rgba(0,0,0,0.2)',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ color: colors.text, marginBottom: '8px', fontSize: '24px', fontWeight: 'bold' }}>
+            {authMode === 'login' ? 'Tekrar Hoşgeldin!' : (authMode === 'register' ? 'Hesap Oluştur' : 'Şifreni Sıfırla')}
+          </h2>
+          <div style={{ color: colors.textSecondary, fontSize: '16px', marginBottom: '20px' }}>
+            {authMode === 'login' ? 'Görüşmeyeli çok oldu!' : 'Hemen aramıza katıl.'}
+          </div>
 
-        {(authMode === 'login' || authMode === 'register' || authMode === 'reset') && (
-          <input type="password" placeholder={authMode === 'reset' ? "Yeni Şifre" : "Şifre"} value={authInput.password} onChange={e => setAuthInput({ ...authInput, password: e.target.value })} style={{ width: '100%', padding: '15px', margin: '10px 0', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '8px', WebkitAppRegion: 'no-drag', cursor: 'text' }} />
-        )}
+          {authError && <div style={{ color: colors.error, fontSize: '12px', marginBottom: '10px', textAlign: 'left' }}>{authError.toUpperCase()}</div>}
 
-        {authMode === 'reset' && (
-          <input type="text" placeholder="Kurtarma PIN (4 haneli)" value={authInput.recovery_pin} onChange={e => setAuthInput({ ...authInput, recovery_pin: e.target.value })} style={{ width: '100%', padding: '15px', margin: '10px 0', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '8px', WebkitAppRegion: 'no-drag', cursor: 'text' }} />
-        )}
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+            <label style={{ color: colors.textSecondary, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+              KULLANICI ADI {authMode === 'register' && <span style={{ color: colors.error }}>*</span>}
+            </label>
+            <input
+              type="text"
+              value={authInput.username}
+              onChange={e => setAuthInput({ ...authInput, username: e.target.value })}
+              style={{ width: '100%', padding: '10px', backgroundColor: '#202225', border: '1px solid #202225', borderRadius: '3px', color: '#dcddde', outline: 'none', height: '40px', fontSize: '16px', boxSizing: 'border-box' }}
+              onFocus={(e) => e.target.style.borderColor = '#007AFF'}
+              onBlur={(e) => e.target.style.borderColor = '#202225'}
+            />
+          </div>
 
-        <button onClick={handleAuthSubmit} style={{ width: '100%', padding: '15px', background: '#34C759', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', marginTop: '10px', WebkitAppRegion: 'no-drag' }}>
-          {authMode === 'login' ? 'Giriş Yap' : (authMode === 'register' ? 'Kayıt Ol' : 'Şifreyi Sıfırla')}
-        </button>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '12px', color: '#888' }}>
-          <span style={{ cursor: 'pointer', WebkitAppRegion: 'no-drag' }} onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
-            {authMode === 'login' ? 'Hesap Oluştur' : 'Giriş Yap'}
-          </span>
-          {authMode === 'login' && (
-            <span style={{ cursor: 'pointer', color: '#007AFF', WebkitAppRegion: 'no-drag' }} onClick={() => setAuthMode('reset')}>
-              Şifremi Unuttum
-            </span>
+          {authMode === 'register' && (
+            <>
+              <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+                <label style={{ color: '#b9bbbe', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                  GÖRÜNEN ISIM
+                </label>
+                <input
+                  type="text"
+                  value={authInput.display_name}
+                  onChange={e => setAuthInput({ ...authInput, display_name: e.target.value })}
+                  style={{ width: '100%', padding: '10px', backgroundColor: '#202225', border: '1px solid #202225', borderRadius: '3px', color: '#dcddde', outline: 'none', height: '40px', fontSize: '16px', boxSizing: 'border-box' }}
+                  onFocus={(e) => e.target.style.borderColor = '#007AFF'}
+                  onBlur={(e) => e.target.style.borderColor = '#202225'}
+                />
+              </div>
+              <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+                <label style={{ color: '#b9bbbe', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                  KURTARMA PIN (4 HANELI) <span style={{ color: '#ed4245' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  maxLength="4"
+                  value={authInput.recovery_pin}
+                  onChange={e => setAuthInput({ ...authInput, recovery_pin: e.target.value })}
+                  style={{ width: '100%', padding: '10px', backgroundColor: '#202225', border: '1px solid #202225', borderRadius: '3px', color: '#dcddde', outline: 'none', height: '40px', fontSize: '16px', boxSizing: 'border-box' }}
+                  onFocus={(e) => e.target.style.borderColor = '#007AFF'}
+                  onBlur={(e) => e.target.style.borderColor = '#202225'}
+                />
+              </div>
+            </>
           )}
+
+          {(authMode === 'login' || authMode === 'register' || authMode === 'reset') && (
+            <div style={{ textAlign: 'left', marginBottom: authMode === 'login' ? '4px' : '20px' }}>
+              <label style={{ color: '#b9bbbe', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                {authMode === 'reset' ? "YENİ ŞİFRE" : "ŞİFRE"} <span style={{ color: '#ed4245' }}>*</span>
+              </label>
+              <input
+                type="password"
+                value={authInput.password}
+                onChange={e => setAuthInput({ ...authInput, password: e.target.value })}
+                style={{ width: '100%', padding: '10px', backgroundColor: '#202225', border: '1px solid #202225', borderRadius: '3px', color: '#dcddde', outline: 'none', height: '40px', fontSize: '16px', boxSizing: 'border-box' }}
+                onFocus={(e) => e.target.style.borderColor = '#007AFF'}
+                onBlur={(e) => e.target.style.borderColor = '#202225'}
+              />
+            </div>
+          )}
+
+          {authMode === 'login' && (
+            <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+              <span onClick={() => setAuthMode('reset')} style={{ color: '#00aff4', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>Şifreni mi unuttun?</span>
+            </div>
+          )}
+
+          {authMode === 'reset' && (
+            <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+              <label style={{ color: '#b9bbbe', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                KURTARMA PIN (4 HANELI)
+              </label>
+              <input
+                type="text"
+                value={authInput.recovery_pin}
+                onChange={e => setAuthInput({ ...authInput, recovery_pin: e.target.value })}
+                style={{ width: '100%', padding: '10px', backgroundColor: '#202225', border: '1px solid #202225', borderRadius: '3px', color: '#dcddde', outline: 'none', height: '40px', fontSize: '16px', boxSizing: 'border-box' }}
+                onFocus={(e) => e.target.style.borderColor = '#007AFF'}
+                onBlur={(e) => e.target.style.borderColor = '#202225'}
+              />
+            </div>
+          )}
+
+          <button onClick={handleAuthSubmit} style={{ width: '100%', height: '44px', backgroundColor: '#5865F2', color: '#fff', border: 'none', borderRadius: '3px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px', transition: 'background-color 0.2s' }}
+            onMouseEnter={e => e.target.style.backgroundColor = '#4752c4'}
+            onMouseLeave={e => e.target.style.backgroundColor = '#5865F2'}
+          >
+            {authMode === 'login' ? 'Giriş Yap' : (authMode === 'register' ? 'Kayıt Ol' : 'Şifreyi Sıfırla')}
+          </button>
+
+          <div style={{ textAlign: 'left', fontSize: '14px', color: '#72767d' }}>
+            {authMode === 'login' ? (
+              <>
+                Hesabın yok mu? <span onClick={() => setAuthMode('register')} style={{ color: '#00aff4', cursor: 'pointer' }}>Kaydol</span>
+              </>
+            ) : (
+              <>
+                Hesabın var mı? <span onClick={() => setAuthMode('login')} style={{ color: '#00aff4', cursor: 'pointer' }}>Giriş Yap</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1498,11 +1697,9 @@ function App() {
       flexDirection: 'row',
       width: '100vw',
       height: '100vh',
-      backgroundColor: theme === 'dark' ? '#0f0f0f' : '#f0f0f0',
-      background: theme === 'dark'
-        ? 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)'
-        : 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
-      color: theme === 'dark' ? 'white' : 'black',
+      backgroundColor: colors.background,
+      background: `linear-gradient(135deg, ${colors.background} 0%, ${colors.sidebar} 100%)`,
+      color: colors.text,
       fontFamily: '"Inter", sans-serif',
       overflow: 'hidden'
     }}>
@@ -1522,6 +1719,7 @@ function App() {
 
       {/* COL 2: CHANNEL LIST / FRIENDS PANEL */}
       <ChannelList
+        colors={colors}
         width={channelListWidth}
         showFriendsList={showFriendsList}
         friendRequests={friendRequests}
@@ -1599,6 +1797,7 @@ function App() {
         {/* CHAT AREA (Server OR DM) */}
         {(selectedChannel?.type === 'text' || selectedDM) ? (
           <ChatArea
+            colors={colors}
             selectedChannel={selectedChannel}
             selectedDM={selectedDM}
             messages={messages}
@@ -1625,6 +1824,7 @@ function App() {
         ) : (
           selectedChannel?.type === 'voice' ? (
             <VoiceRoom
+              colors={colors}
               selectedChannel={selectedChannel}
               remoteStreams={remoteStreams}
               activeUsersRef={activeUsersRef}
@@ -1639,6 +1839,7 @@ function App() {
           ) : (
             /* FRIENDS DASHBOARD (HOME VIEW) */
             <FriendsDashboard
+              colors={colors}
               friends={friends}
               friendRequests={friendRequests}
               onlineUserIds={onlineUserIds}
@@ -2110,13 +2311,13 @@ function App() {
               {/* Sidebar */}
               <div style={{ width: '280px', backgroundColor: '#18191c', padding: '60px 20px 20px 40px', display: 'flex', flexDirection: 'column', flexShrink: 0, justifyContent: 'flex-start' }}>
                 <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#aaa', marginBottom: '10px', paddingLeft: '10px' }}>KULLANICI AYARLARI</div>
-                {['Profil', 'Ses ve Görüntü', 'Uygulama'].map(tab => {
+                {['Profil', 'Ses ve Görüntü', 'Temalar', 'Uygulama'].map(tab => {
                   const id = tab.toLowerCase().replace(/ /g, '_');
-                  const isActive = activeSettingsTab === (tab === 'Profil' ? 'profile' : (tab === 'Ses ve Görüntü' ? 'voice' : 'app'));
+                  const isActive = activeSettingsTab === (tab === 'Profil' ? 'profile' : (tab === 'Ses ve Görüntü' ? 'voice' : (tab === 'Temalar' ? 'themes' : 'app')));
                   return (
                     <div
                       key={tab}
-                      onClick={() => setActiveSettingsTab(tab === 'Profil' ? 'profile' : (tab === 'Ses ve Görüntü' ? 'voice' : 'app'))}
+                      onClick={() => setActiveSettingsTab(tab === 'Profil' ? 'profile' : (tab === 'Ses ve Görüntü' ? 'voice' : (tab === 'Temalar' ? 'themes' : 'app')))}
                       style={{
                         padding: '6px 10px',
                         marginBottom: '2px',
@@ -2155,7 +2356,7 @@ function App() {
                 <div style={{ maxWidth: '750px', marginLeft: '40px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>
-                      {activeSettingsTab === 'profile' ? 'Profilim' : (activeSettingsTab === 'voice' ? 'Ses ve Görüntü' : 'Uygulama Ayarları')}
+                      {activeSettingsTab === 'profile' ? 'Profilim' : (activeSettingsTab === 'voice' ? 'Ses ve Görüntü' : (activeSettingsTab === 'themes' ? 'Temalar' : 'Uygulama Ayarları'))}
                     </h2>
                     <div
                       onClick={() => setShowSettings(false)}
@@ -2379,25 +2580,106 @@ function App() {
                     </div>
                   )}
 
-                  {activeSettingsTab === 'app' && (
+                  {activeSettingsTab === 'themes' && (
                     <div>
-                      <div style={{ marginBottom: '20px' }}>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#aaa', marginBottom: '8px' }}>TEMA</label>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <div
-                            onClick={() => { setTheme('dark'); localStorage.setItem('safezone_theme', 'dark'); }}
-                            style={{ width: '100px', height: '80px', backgroundColor: '#2f3136', border: theme === 'dark' ? '2px solid #5865F2' : '2px solid transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}
-                          >
-                            Koyu
-                          </div>
-                          <div
-                            onClick={() => { setTheme('light'); localStorage.setItem('safezone_theme', 'light'); }}
-                            style={{ width: '100px', height: '80px', backgroundColor: '#fff', border: theme === 'light' ? '2px solid #5865F2' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}
-                          >
-                            Açık
-                          </div>
+                      <div style={{ marginBottom: '30px' }}>
+                        <div style={{ fontSize: '14px', color: '#dcddde', marginBottom: '20px' }}>
+                          Uygulamanın görünümünü özelleştirin. Her paletten sonra Açık veya Koyu mod seçebilirsiniz.
+                        </div>
+
+                        {/* Theme Palette Cards */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                          {getPalettes().map(palette => {
+                            const isActive = theme.palette === palette;
+                            const colors = getTheme(palette, 'dark'); // Preview colors for card
+
+                            return (
+                              <div
+                                key={palette}
+                                style={{
+                                  padding: '16px',
+                                  background: '#2f3136',
+                                  borderRadius: '8px',
+                                  border: isActive ? '2px solid ' + colors.accent : '2px solid transparent',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onClick={() => {
+                                  const newTheme = { palette, mode: theme.mode };
+                                  setTheme(newTheme);
+                                  localStorage.setItem('safezone_theme', JSON.stringify(newTheme));
+                                }}
+                              >
+                                {/* Palette Name */}
+                                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '12px', color: '#fff' }}>
+                                  {getPaletteName(palette)}
+                                </div>
+
+                                {/* Color Preview Swatches */}
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                  <div style={{ width: '50px', height: '50px', borderRadius: '6px', backgroundColor: colors.background, border: '1px solid rgba(255,255,255,0.1)' }}></div>
+                                  <div style={{ width: '50px', height: '50px', borderRadius: '6px', backgroundColor: colors.sidebar }}></div>
+                                  <div style={{ width: '50px', height: '50px', borderRadius: '6px', backgroundColor: colors.card }}></div>
+                                  <div style={{ width: '50px', height: '50px', borderRadius: '6px', backgroundColor: colors.accent }}></div>
+                                </div>
+
+                                {/* Light/Dark Toggle */}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const newTheme = { palette, mode: 'dark' };
+                                      setTheme(newTheme);
+                                      localStorage.setItem('safezone_theme', JSON.stringify(newTheme));
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px',
+                                      textAlign: 'center',
+                                      borderRadius: '4px',
+                                      backgroundColor: isActive && theme.mode === 'dark' ? colors.accent : '#40444b',
+                                      color: '#fff',
+                                      fontSize: '12px',
+                                      fontWeight: isActive && theme.mode === 'dark' ? 'bold' : 'normal',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    🌙 Koyu
+                                  </div>
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const newTheme = { palette, mode: 'light' };
+                                      setTheme(newTheme);
+                                      localStorage.setItem('safezone_theme', JSON.stringify(newTheme));
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px',
+                                      textAlign: 'center',
+                                      borderRadius: '4px',
+                                      backgroundColor: isActive && theme.mode === 'light' ? colors.accent : '#40444b',
+                                      color: '#fff',
+                                      fontSize: '12px',
+                                      fontWeight: isActive && theme.mode === 'light' ? 'bold' : 'normal',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    ☀️ Açık
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {activeSettingsTab === 'app' && (
+                    <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Windows Başlangıcında Çalıştır</div>

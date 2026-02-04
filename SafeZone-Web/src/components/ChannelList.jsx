@@ -3,6 +3,7 @@ import UserFooter from './UserFooter';
 import { getUrl } from '../utils/api';
 
 const ChannelList = ({
+    colors,
     width,
     showFriendsList,
     friendRequests,
@@ -40,10 +41,10 @@ const ChannelList = ({
     children
 }) => {
     return (
-        <div style={{ width: `${width}px`, flexShrink: 0, background: 'rgba(22, 22, 22, 0.6)', backdropFilter: 'blur(20px) saturate(180%)', display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255, 255, 255, 0.1)', position: 'relative', order: 2 }}>
+        <div style={{ width: `${width}px`, flexShrink: 0, background: colors.sidebar, backdropFilter: 'blur(20px) saturate(180%)', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${colors.border}`, position: 'relative', order: 2 }}>
             {showFriendsList ? (
                 <>
-                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', fontWeight: 'bold', fontSize: '16px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                    <div style={{ padding: '20px', borderBottom: `1px solid ${colors.border}`, fontWeight: 'bold', fontSize: '16px', background: colors.cardHover, color: colors.text }}>
                         Arkadaşlar
                     </div>
 
