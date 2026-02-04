@@ -1,0 +1,36 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+build/
+release/
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+*.spec
+
+# Swift / Xcode
+.build/
+*.xcodeproj/project.xcworkspace
+*.xcodeproj/xcuserdata
+DerivedData/
+
+# VS Code
+.vscode/

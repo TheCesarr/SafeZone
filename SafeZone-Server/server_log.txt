@@ -1,0 +1,25 @@
+--- SERVER STARTED AT 2026-02-04 18:45:10.898851 ---
+18:45:21 | [*] LOBBY    | Lobby connection: admin. Total: 1
+18:45:21 | [*] ROOM     | Dynamic room created: Genel Sohbet (564b82d8-2056-48d6-bf1b-c4334eee6fa6)
+18:45:21 | [+] BAGLANDI | admin --> Genel Sohbet
+18:45:22 | [-] AYRILDI  | admin <-- Genel Sohbet
+18:45:23 | [*] ROOM     | Dynamic room created: Ses Odası (9fabde58-9ffb-4e93-8581-6b5b0319befc)
+18:45:23 | [+] BAGLANDI | admin --> Ses Odası
+18:45:38 | [*] ROOM     | Dynamic room created: Genel Sohbet (d7d526c2-7110-44ea-bcfe-220d486d51f0)
+18:45:38 | [+] BAGLANDI | admin --> Genel Sohbet
+18:45:38 | [-] AYRILDI  | admin <-- Ses Odası
+18:45:38 | [-] AYRILDI  | admin <-- Genel Sohbet
+18:45:38 | [*] ROOM     | Dynamic room created: Ses Odası (bfddf8b8-f156-4807-ac99-a618fc88970d)
+18:45:38 | [+] BAGLANDI | admin --> Ses Odası
+18:45:40 | [+] BAGLANDI | admin --> Genel Sohbet
+18:45:40 | [-] AYRILDI  | admin <-- Genel Sohbet
+18:45:41 | [+] BAGLANDI | admin --> Genel Sohbet
+18:45:41 | [-] AYRILDI  | admin <-- Ses Odası
+18:45:42 | [-] AYRILDI  | admin <-- Genel Sohbet
+18:45:43 | [+] BAGLANDI | admin --> Ses Odası
+18:45:44 | [-] AYRILDI  | admin <-- Ses Odası
+18:45:47 | [+] BAGLANDI | admin --> Ses Odası
+18:45:49 | [+] BAGLANDI | admin --> Genel Sohbet
+18:45:55 | [+] BAGLANDI | admin --> Genel Sohbet
+18:46:00 | [-] AYRILDI  | admin <-- Genel Sohbet
+18:46:00 | [*] LOBBY    | Lobby disconnected: admin. Total: 0

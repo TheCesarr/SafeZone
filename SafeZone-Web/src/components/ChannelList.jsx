@@ -1,0 +1,270 @@
+import React from 'react';
+import UserFooter from './UserFooter';
+import { getUrl } from '../utils/api';
+
+const ChannelList = ({
+    width,
+    showFriendsList,
+    friendRequests,
+    friends,
+    onlineUserIds,
+    handleRespondRequest,
+    setShowAddFriend,
+    handleStartDM,
+    handleRemoveFriend,
+    selectedServer,
+    setShowChannelCreateModal,
+    handleChannelClick,
+    setContextMenu,
+    selectedChannel,
+    activeVoiceChannel,
+    roomDetails,
+    speakingUsers,
+    voiceStates,
+    // UserFooter props
+    authState,
+    isMuted,
+    isDeafened,
+    isNoiseCancelled,
+    isScreenSharing,
+    ping,
+    onDisconnect,
+    onToggleMute,
+    onToggleDeafen,
+    onToggleNoiseCancellation,
+    onScreenShare,
+    stopScreenShare,
+    children
+}) => {
+    return (
+        <div style={{ width: `${width}px`, flexShrink: 0, background: 'rgba(22, 22, 22, 0.6)', backdropFilter: 'blur(20px) saturate(180%)', display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255, 255, 255, 0.1)', position: 'relative', order: 2 }}>
+            {showFriendsList ? (
+                <>
+                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', fontWeight: 'bold', fontSize: '16px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                        Arkadaşlar
+                    </div>
+
+                    {/* PENDING REQUESTS SECTION */}
+                    {friendRequests.length > 0 && (
+                        <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', margin: '10px', borderRadius: '8px', boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.2)' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#aaa', marginBottom: '8px' }}>GELEN İSTEKLER ({friendRequests.length})</div>
+                            {friendRequests.map(req => (
+                                <div key={req.username} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                            {req.username.slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <span style={{ fontSize: '12px' }}>{req.username}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                        <button onClick={() => handleRespondRequest(req.username, 'accept')} style={{ border: 'none', background: '#34C759', color: '#fff', borderRadius: '3px', cursor: 'pointer', padding: '2px 6px' }}>✓</button>
+                                        <button onClick={() => handleRespondRequest(req.username, 'reject')} style={{ border: 'none', background: '#f04747', color: '#fff', borderRadius: '3px', cursor: 'pointer', padding: '2px 6px' }}>✕</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div style={{ flexGrow: 1, padding: '10px', overflowY: 'auto' }}>
+                        <div
+                            onClick={() => setShowAddFriend(true)}
+                            style={{
+                                padding: '12px',
+                                marginBottom: '8px',
+                                borderRadius: '6px',
+                                backgroundColor: '#34C759',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                textAlign: 'center',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            + Arkadaş Ekle
+                        </div>
+
+                        {friends.length === 0 ? (
+                            <div style={{ padding: '20px', color: '#666', textAlign: 'center' }}>
+                                <p>Henüz arkadaşın yok!</p>
+                                <p style={{ fontSize: '12px' }}>Arkadaş ekle butonuna tıkla.</p>
+                            </div>
+                        ) : (
+                            friends.map(friend => (
+                                <div key={friend.username} style={{ padding: '10px', marginBottom: '2px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                                            {friend.username.slice(0, 2).toUpperCase()}
+                                            {onlineUserIds.includes(friend.username) && (
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#34C759', position: 'absolute', bottom: '-2px', right: '-2px', border: '2px solid #1e1e1e' }}></div>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontWeight: onlineUserIds.includes(friend.username) ? 'bold' : 'normal', color: onlineUserIds.includes(friend.username) ? '#fff' : '#aaa' }}>
+                                                {friend.display_name || friend.username}
+                                            </span>
+                                            <span style={{ fontSize: '10px', color: '#666' }}>#{friend.discriminator}</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                        <button
+                                            onClick={() => handleStartDM(friend)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}
+                                            title="Mesaj Gönder"
+                                        >
+                                            💬
+                                        </button>
+                                        <button
+                                            onClick={() => handleRemoveFriend(friend.username)}
+                                            style={{ background: 'none', border: 'none', color: '#f04747', cursor: 'pointer', fontSize: '14px' }}
+                                            title="Arkadaşı Kaldır"
+                                        >
+                                            ❌
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <UserFooter
+                        authState={authState}
+                        activeVoiceChannel={activeVoiceChannel}
+                        selectedServer={selectedServer}
+                        isMuted={isMuted}
+                        isDeafened={isDeafened}
+                        isNoiseCancelled={isNoiseCancelled}
+                        isScreenSharing={isScreenSharing}
+                        ping={ping}
+                        onDisconnect={onDisconnect}
+                        onToggleMute={onToggleMute}
+                        onToggleDeafen={onToggleDeafen}
+                        onToggleNoiseCancellation={onToggleNoiseCancellation}
+                        onScreenShare={onScreenShare}
+                        stopScreenShare={stopScreenShare}
+                    />
+                </>
+            ) : selectedServer ? (
+                <>
+                    <div style={{ padding: '20px', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '57px', boxSizing: 'border-box' }}>
+                        <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedServer.name}</div>
+                            <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>CODE: {selectedServer.invite_code}</div>
+                        </div>
+                        <button
+                            onClick={() => setShowChannelCreateModal(true)}
+                            title="Kanal Ekle"
+                            style={{ background: 'none', border: 'none', color: '#34C759', fontSize: '20px', cursor: 'pointer', padding: '5px' }}
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <div style={{ flexGrow: 1, padding: '10px', overflowY: 'auto' }}>
+                        {selectedServer.channels?.map(ch => (
+                            <div key={ch.id}>
+                                <div
+                                    onClick={() => handleChannelClick(ch)}
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        setContextMenu({ x: e.clientX, y: e.clientY, channelId: ch.id, channel: ch });
+                                    }}
+                                    style={{
+                                        padding: '10px', marginBottom: '2px', borderRadius: '6px',
+                                        backgroundColor: selectedChannel?.id === ch.id ? '#333' : 'transparent',
+                                        color: selectedChannel?.id === ch.id ? '#fff' : (activeVoiceChannel?.id === ch.id ? '#34C759' : '#888'),
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    <span style={{ flexShrink: 0 }}>{ch.type === 'voice' ? '🔊' : '💬'}</span>
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ch.name}</span>
+                                </div>
+                                {/* ACTIVE VOICE USERS AVATARS (Always from Lobby RoomDetails) */}
+                                {ch.type === 'voice' && roomDetails[ch.id] && roomDetails[ch.id].length > 0 && (
+                                    <div style={{ paddingLeft: '28px', marginBottom: '8px' }}>
+                                        {roomDetails[ch.id].map(uid => {
+                                            const isCurrentUser = authState.user && uid === authState.user.username; // Need to verify uuid vs username, assume username for now based on App.jsx
+                                            const isSpeaking = speakingUsers.has(uid);
+                                            return (
+                                                <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                                    <div style={{
+                                                        width: '14px',
+                                                        height: '14px',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#555',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '8px',
+                                                        color: 'white',
+                                                        border: isSpeaking ? '2px solid #34C759' : '2px solid transparent',
+                                                        boxShadow: isSpeaking ? '0 0 8px #34C759' : 'none',
+                                                        transition: 'all 0.2s ease'
+                                                    }}>
+                                                        {uid.slice(0, 1).toUpperCase()}
+                                                    </div>
+                                                    <span style={{ fontSize: '11px', color: '#aaa' }}>{uid}</span>
+                                                    {/* Show mute/deafen icons for all users */}
+                                                    {(() => {
+                                                        const userVoiceState = isCurrentUser ? { isMuted, isDeafened, isScreenSharing } : (voiceStates[uid] || {});
+                                                        return (userVoiceState.isMuted || userVoiceState.isDeafened || userVoiceState.isScreenSharing) && (
+                                                            <div style={{ display: 'flex', gap: '2px', marginLeft: '2px' }}>
+                                                                {userVoiceState.isScreenSharing && <span style={{ fontSize: '10px' }} title="Yayında">📺</span>}
+                                                                {userVoiceState.isMuted && <span style={{ fontSize: '10px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Muted">🎙️</span>}
+                                                                {userVoiceState.isDeafened && <span style={{ fontSize: '10px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Deafened">🎧</span>}
+                                                            </div>
+                                                        )
+                                                    })()}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    <UserFooter
+                        authState={authState}
+                        activeVoiceChannel={activeVoiceChannel}
+                        selectedServer={selectedServer}
+                        isMuted={isMuted}
+                        isDeafened={isDeafened}
+                        isNoiseCancelled={isNoiseCancelled}
+                        isScreenSharing={isScreenSharing}
+                        ping={ping}
+                        onDisconnect={onDisconnect}
+                        onToggleMute={onToggleMute}
+                        onToggleDeafen={onToggleDeafen}
+                        onToggleNoiseCancellation={onToggleNoiseCancellation}
+                        onScreenShare={onScreenShare}
+                        stopScreenShare={stopScreenShare}
+                    />
+                </>
+            ) : (
+                <div style={{ padding: '20px', color: '#666', textAlign: 'center', marginTop: '50px' }}>
+                    <p>Bir sunucu seçin veya oluşturun.</p>
+                    <UserFooter
+                        authState={authState}
+                        activeVoiceChannel={activeVoiceChannel}
+                        selectedServer={selectedServer}
+                        isMuted={isMuted}
+                        isDeafened={isDeafened}
+                        isNoiseCancelled={isNoiseCancelled}
+                        isScreenSharing={isScreenSharing}
+                        ping={ping}
+                        onDisconnect={onDisconnect}
+                        onToggleMute={onToggleMute}
+                        onToggleDeafen={onToggleDeafen}
+                        onToggleNoiseCancellation={onToggleNoiseCancellation}
+                        onScreenShare={onScreenShare}
+                        stopScreenShare={stopScreenShare}
+                    />
+                </div>
+            )}
+
+            {children}
+        </div>
+    );
+};
+
+export default ChannelList;
