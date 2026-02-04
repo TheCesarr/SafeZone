@@ -76,8 +76,22 @@ def log_event(event_type: str, message: str):
 
 async def broadcast_room_update():
     # 1. Global Online Users
-    online_users = list(lobby.active_connections.keys())
+    online_usernames = list(lobby.active_connections.keys())
     
+    # Fetch status for these users from DB
+    users_with_status = []
+    if online_usernames:
+        placeholders = ','.join('?' for _ in online_usernames)
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute(f"SELECT username, status, display_name, avatar_url, avatar_color, discriminator FROM users WHERE username IN ({placeholders})", online_usernames)
+        rows = c.fetchall()
+        
+        for row in rows:
+            users_with_status.append(dict(row))
+        conn.close()
+
     # 2. Room Details (Who is in which room)
     room_details = {}
     for r_id, r in rooms.items():
@@ -85,8 +99,8 @@ async def broadcast_room_update():
 
     message = json.dumps({
         "type": "lobby_update",
-        "total_online": len(online_users),
-        "online_users": online_users,
+        "total_online": len(online_usernames),
+        "online_users": users_with_status, # Send full objects instead of just strings
         "room_details": room_details
     })
     
@@ -170,6 +184,12 @@ def init_db():
     except:
         pass # Column already exists
         
+    # Add status column
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'online'")
+    except:
+        pass # Column already exists
+        
     # Servers
     c.execute('''CREATE TABLE IF NOT EXISTS servers (
                     id TEXT PRIMARY KEY,
@@ -219,6 +239,28 @@ def init_db():
                     FOREIGN KEY(sender_id) REFERENCES users(id),
                     FOREIGN KEY(sender_id) REFERENCES users(id),
                     FOREIGN KEY(receiver_id) REFERENCES users(id)
+                )''')
+
+    # ROLES TABLE
+    c.execute('''CREATE TABLE IF NOT EXISTS roles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    server_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    color TEXT NOT NULL,
+                    position INTEGER NOT NULL,
+                    permissions INTEGER DEFAULT 0,
+                    FOREIGN KEY(server_id) REFERENCES servers(id)
+                )''')
+
+    # USER_ROLES TABLE
+    c.execute('''CREATE TABLE IF NOT EXISTS user_roles (
+                    user_id INTEGER NOT NULL,
+                    role_id INTEGER NOT NULL,
+                    server_id TEXT NOT NULL,
+                    PRIMARY KEY(user_id, role_id, server_id),
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    FOREIGN KEY(role_id) REFERENCES roles(id),
+                    FOREIGN KEY(server_id) REFERENCES servers(id)
                 )''')
 
     # Friend Requests table
@@ -497,22 +539,65 @@ async def get_server_members(server_id: str, token: str):
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
-        # Validate Token (Simple check)
+        # Validate Token
         c.execute("SELECT id FROM users WHERE token = ?", (token,))
         if not c.fetchone():
             conn.close()
             return {"status": "error", "message": "Invalid token"}
             
+        # 1. Fetch Members with Details
         c.execute('''
-            SELECT u.username, u.display_name, m.role
+            SELECT m.user_id, u.username, u.display_name, u.discriminator, u.avatar_url, u.avatar_color, u.status, m.role as legacy_role
             FROM members m
             JOIN users u ON m.user_id = u.id
             WHERE m.server_id = ?
         ''', (server_id,))
+        members_raw = [dict(row) for row in c.fetchall()]
+
+        # 2. Fetch all Server Roles
+        c.execute("SELECT * FROM roles WHERE server_id = ?", (server_id,))
+        server_roles = {r['id']: dict(r) for r in c.fetchall()} # id -> role dict
+
+        # 3. Fetch User Role Assignments
+        c.execute("SELECT user_id, role_id FROM user_roles WHERE server_id = ?", (server_id,))
+        assignments = c.fetchall()
         
-        members = [dict(row) for row in c.fetchall()]
+        # Map user_id -> list of role_ids
+        user_role_map = {}
+        for row in assignments:
+            uid = row['user_id']
+            rid = row['role_id']
+            if uid not in user_role_map: user_role_map[uid] = []
+            user_role_map[uid].append(rid)
+
+        # 4. Enrich Members
+        enriched_members = []
+        for m in members_raw:
+            uid = m['user_id']
+            
+            # Find highest role
+            role_ids = user_role_map.get(uid, [])
+            highest_role = None
+            
+            # Get actual role objects
+            my_roles = [server_roles[rid] for rid in role_ids if rid in server_roles]
+            
+            if my_roles:
+                # Sort by position (Assume higher number = higher rank? Or lower? Let's stick to Higher Number = Higher Rank for Discord style)
+                # Actually Discord stores position as integer, usually 0 is @everyone (lowest).
+                my_roles.sort(key=lambda x: x['position'], reverse=True) 
+                highest_role = my_roles[0]
+            
+            m['roles'] = [r['id'] for r in my_roles] # Return list of role IDs
+            m['highest_role'] = {
+                "name": highest_role['name'] if highest_role else ("Owner" if m['legacy_role'] == 'owner' else "Member"),
+                "color": highest_role['color'] if highest_role else "#99AAB5", # Default Gray
+                "position": highest_role['position'] if highest_role else 0
+            }
+            enriched_members.append(m)
+            
         conn.close()
-        return {"status": "success", "members": members}
+        return {"status": "success", "members": enriched_members}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -620,31 +705,264 @@ async def rename_channel(data: ChannelRename):
         if not channel:
             conn.close()
             return {"status": "error", "message": "Channel not found"}
-        
+
+        # Check Owner or Manage Channels Permission
         c.execute("SELECT owner_id FROM servers WHERE id = ?", (channel['server_id'],))
         server = c.fetchone()
         
+        # Note: We will add permission check helper later. For now owner only.
         if server['owner_id'] != user['id']:
-            conn.close()
-            return {"status": "error", "message": "Only server owner can rename channels"}
+             conn.close()
+             return {"status": "error", "message": "Yetkiniz yok!"}
         
-        # 3. Update Channel Name
         c.execute("UPDATE channels SET name = ? WHERE id = ?", (data.new_name, data.channel_id))
-        
         conn.commit()
         conn.close()
         
-        log_event("CHANNEL", f"Channel renamed: {data.channel_id} -> {data.new_name}")
-        
-        # Broadcast lobby update
-        await broadcast_lobby_update()
-        
+        await broadcast_room_update()
         return {"status": "success"}
-        
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return {"status": "error", "message": str(e)}
+
+# --- ROLE MANAGEMENT MODELS ---
+class RoleCreate(BaseModel):
+    token: str
+    name: str
+    color: str
+    permissions: int
+
+class RoleUpdate(BaseModel):
+    token: str
+    name: str
+    color: str
+    permissions: int
+    position: int
+
+class RoleAssign(BaseModel):
+    token: str
+    user_id: int # The user to assign role to
+
+# --- ROLE MANAGEMENT ENDPOINTS ---
+
+@app.get("/server/{server_id}/roles")
+async def get_server_roles(server_id: str):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM roles WHERE server_id = ? ORDER BY position ASC", (server_id,))
+        roles = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return {"status": "success", "roles": roles}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/server/{server_id}/roles")
+async def create_role(server_id: str, data: RoleCreate):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Auth
+        c.execute("SELECT id FROM users WHERE token = ?", (data.token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+
+        # Check Permission (Owner only for MVP)
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        if not server or server['owner_id'] != user['id']:
+            conn.close()
+            return {"status": "error", "message": "Unauthorized"}
+            
+        # Get next position (highest position + 1)
+        # Note: In Discord, lower number = higher position usually, or vice versa. 
+        # Let's say: 0 is lowest (default). We want new roles to be above default but below others? 
+        # Or just append to bottom. Let's do: 1 is lowest?
+        # Let's just use auto-increment logic or max + 1.
+        c.execute("SELECT MAX(position) as max_pos FROM roles WHERE server_id = ?", (server_id,))
+        row = c.fetchone()
+        new_pos = (row['max_pos'] or 0) + 1
+        
+        c.execute("INSERT INTO roles (server_id, name, color, position, permissions) VALUES (?, ?, ?, ?, ?)",
+                  (server_id, data.name, data.color, new_pos, data.permissions))
+        conn.commit()
+        
+        # Get ID of inserted role
+        new_role_id = c.lastrowid
+        
+        # Return the new role object
+        new_role = {
+            "id": new_role_id,
+            "server_id": server_id,
+            "name": data.name,
+            "color": data.color,
+            "position": new_pos,
+            "permissions": data.permissions
+        }
+        
+        conn.close()
+        return {"status": "success", "role": new_role}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.put("/server/{server_id}/roles/{role_id}")
+async def update_role(server_id: str, role_id: int, data: RoleUpdate):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Auth
+        c.execute("SELECT id FROM users WHERE token = ?", (data.token,))
+        user = c.fetchone()
+        if not user: return {"status": "error", "message": "Invalid token"}
+
+        # Check Permission
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        if not server or server['owner_id'] != user['id']:
+            conn.close()
+            return {"status": "error", "message": "Unauthorized"}
+
+        c.execute("UPDATE roles SET name=?, color=?, permissions=?, position=? WHERE id=?", 
+                 (data.name, data.color, data.permissions, data.position, role_id))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/server/{server_id}/roles/{role_id}")
+async def delete_role(server_id: str, role_id: int, token: str):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        
+        # Auth
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user: return {"status": "error", "message": "Invalid token"}
+
+        # Check Permission
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        # Use row factory or index
+        if not server or server[0] != user[0]: # index 0 is owner_id usually check schema
+             conn.close()
+             return {"status": "error", "message": "Unauthorized"}
+             
+        c.execute("DELETE FROM roles WHERE id = ?", (role_id,))
+        c.execute("DELETE FROM user_roles WHERE role_id = ?", (role_id,))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/server/{server_id}/members/{user_id}/roles")
+async def assign_role(server_id: str, user_id: int, data: RoleAssign):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Auth (Requester)
+        c.execute("SELECT id FROM users WHERE token = ?", (data.token,))
+        req_user = c.fetchone()
+        if not req_user: return {"status": "error", "message": "Invalid token"}
+        
+        # Check Permission
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        if not server or server['owner_id'] != req_user['id']:
+            conn.close()
+            return {"status": "error", "message": "Unauthorized"}
+        
+        # Check if role exists
+        # We need role_id from input? The endpoint assumes we are posting a specific role, but I used user_id in path.
+        # Wait, the model `RoleAssign` handles user_id, but where is role_id? 
+        # Better design: POST /.../roles with body { role_id: ... }
+        # Or POST /.../roles/{role_id} to assign?
+        # Let's adjust: The body should have `role_id`.
+        pass 
+        # Reserving for retry or fix. Using a simpler generic endpoint below.
+    except: pass
+    return {"status": "error", "message": "Not implemented"}
+
+@app.post("/server/{server_id}/assign_role")
+async def server_assign_role(server_id: str, data: Dict): 
+    # data: { token, user_id, role_id }
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Auth
+        c.execute("SELECT id FROM users WHERE token = ?", (data.get('token'),))
+        req_user = c.fetchone()
+        if not req_user: 
+             conn.close()
+             return {"status": "error", "message": "Invalid token"}
+
+        # Check Permission
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        if not server or server['owner_id'] != req_user['id']:
+             conn.close()
+             return {"status": "error", "message": "Unauthorized"}
+
+        role_id = data.get('role_id')
+        target_user_id = data.get('user_id')
+        
+        # Assign
+        try:
+            c.execute("INSERT INTO user_roles (user_id, role_id, server_id) VALUES (?, ?, ?)", 
+                     (target_user_id, role_id, server_id))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            pass # Already has role
+            
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/server/{server_id}/remove_role")
+async def server_remove_role(server_id: str, data: Dict): 
+    # data: { token, user_id, role_id }
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Auth
+        c.execute("SELECT id FROM users WHERE token = ?", (data.get('token'),))
+        req_user = c.fetchone()
+        if not req_user: return {"status": "error", "message": "Invalid token"}
+
+        # Check Permission
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        if not server or server['owner_id'] != req_user['id']:
+             conn.close()
+             return {"status": "error", "message": "Unauthorized"}
+
+        role_id = data.get('role_id')
+        target_user_id = data.get('user_id')
+        
+        c.execute("DELETE FROM user_roles WHERE user_id=? AND role_id=? AND server_id=?", 
+                 (target_user_id, role_id, server_id))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 
 @app.post("/channel/delete")
 async def delete_channel(data: ChannelDelete):
@@ -1369,23 +1687,42 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str):
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)
+                
                 if msg.get('type') == 'ping':
                     await websocket.send_text(json.dumps({
                         "type": "pong",
                         "timestamp": msg.get("timestamp")
                     }))
-            except:
-                pass
+                    
+                # HANDLE STATUS UPDATE
+                elif msg.get('type') == 'status_update':
+                    new_status = msg.get('status')
+                    if new_status in ['online', 'idle', 'dnd', 'invisible']:
+                        # Update DB
+                        conn = sqlite3.connect(DB_NAME)
+                        c = conn.cursor()
+                        # Find username from token logic or passed user_id (here user_id is username)
+                        c.execute("UPDATE users SET status = ? WHERE username = ?", (new_status, user_id))
+                        conn.commit()
+                        conn.close()
+                        
+                        # Broadcast update
+                        await broadcast_room_update()
+                        
+            except Exception as e:
+                log_event("ERROR", f"Lobby msg error: {e}")
     except WebSocketDisconnect:
         if user_id in lobby.active_connections and lobby.active_connections[user_id] == websocket:
             del lobby.active_connections[user_id]
-        log_event("LOBBY", f"Lobby disconnected: {user_id}. Total: {len(lobby.active_connections)}")
         await broadcast_room_update()
-    except Exception as e:
-        log_event("ERROR", f"Lobby error: {e}")
-        if user_id in lobby.active_connections and lobby.active_connections[user_id] == websocket:
-            del lobby.active_connections[user_id]
-        await broadcast_room_update()
+
+
+async def broadcast(room, message: str):
+    for conn in room.active_connections:
+        try:
+            await conn['ws'].send_text(message)
+        except:
+            pass # Handle disconnected clients
 
 @app.websocket("/ws/room/{room_id}/{user_id}")
 async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):

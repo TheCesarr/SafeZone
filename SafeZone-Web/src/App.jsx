@@ -8,6 +8,8 @@ import UserFooter from './components/UserFooter';
 import ChatArea from './components/ChatArea';
 import ChannelList from './components/ChannelList';
 import VoiceRoom from './components/VoiceRoom';
+import FriendsDashboard from './components/FriendsDashboard';
+import RoleSettings from './components/RoleSettings';
 
 
 
@@ -117,11 +119,15 @@ function App() {
 
   // SETTINGS STATE
   const [showSettings, setShowSettings] = useState(false)
+  const [showServerSettings, setShowServerSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState('profile')
   const [theme, setTheme] = useState(localStorage.getItem('safezone_theme') || 'dark')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editDisplayName, setEditDisplayName] = useState('')
   const [editAvatarColor, setEditAvatarColor] = useState('#5865F2')
+
+  const [serverRoles, setServerRoles] = useState([]); // Roles for Context Menu
+  const [userContextMenu, setUserContextMenu] = useState(null); // { x, y, user }
 
   const [inputDevices, setInputDevices] = useState([])
   const [outputDevices, setOutputDevices] = useState([])
@@ -135,6 +141,66 @@ function App() {
   const [showAddFriend, setShowAddFriend] = useState(false)
   const [friendInput, setFriendInput] = useState("")
 
+
+
+  // --- ROLE CONTEXT MENU HANDLERS ---
+  const handleUserContextMenu = (e, user) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent other menus
+    setUserContextMenu({ x: e.clientX, y: e.clientY, user });
+  }
+
+  const handleToggleRole = async (roleId, targetUser) => {
+    if (!selectedServer) return;
+    const hasRole = targetUser.roles && targetUser.roles.includes(roleId);
+    const endpoint = hasRole ? 'remove_role' : 'assign_role';
+
+    try {
+      const res = await fetch(getUrl(`/server/${selectedServer.id}/${endpoint}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: authState.token,
+          user_id: targetUser.user_id,
+          role_id: roleId
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        fetchMembers(); // Refresh UI
+        // Optionally close menu or keep it open? Discord keeps it open usually or closes?
+        // Let's keep it open for multiple edits, or just close it. 
+        // If I close it, it's annoying for multiple roles. check/uncheck logic usually keeps it open.
+        // But I'm not re-rendering the menu efficiently if I don't close it?
+        // Actually, fetchMembers updates serverMembers. userContextMenu.user refers to the OLD user object?
+        // Hmm. userContextMenu.user is a reference. 
+        // If serverMembers updates, that reference might be stale if I rely on it for 'roles' check in render.
+        // I should prob pass the user ID and find the fresh user object in the render logic if possible.
+        // Or simple solution: Close menu after toggle.
+        // Let's NOT close it, but I need to handle the stale data issue.
+        // In the render of the context menu, I should look up the user again from serverMembers.
+      } else {
+        alert(data.message);
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  // --- STATUS CHANGE ---
+  const handleStatusChange = (newStatus) => {
+    // 1. Update local state immediately for UI response
+    setAuthState(prev => ({
+      ...prev,
+      user: { ...prev.user, status: newStatus }
+    }));
+
+    // 2. Send update to Lobby WebSocket
+    if (lobbyWs.current && lobbyWs.current.readyState === WebSocket.OPEN) {
+      lobbyWs.current.send(JSON.stringify({
+        type: 'status_update',
+        status: newStatus
+      }));
+    }
+  };
 
   // --- AUDIO HELPER FUNCTIONS ---
   const handleUserVolumeChange = (targetUuid, val) => {
@@ -230,6 +296,8 @@ function App() {
     selectedServerRef.current = selectedServer;
   }, [selectedServer]);
 
+
+
   // --- SERVER CONFIG ---
   const saveServerIp = () => {
     if (!serverIp || serverIp.trim() === '') {
@@ -283,16 +351,26 @@ function App() {
   }
 
   // Fetch Members & Select Default Channel
+  // Data Fetching Helpers
+  const fetchMembers = () => {
+    if (selectedServer && authState.token) {
+      fetch(`${getUrl(`/server/${selectedServer.id}/members`)}?token=${authState.token}`)
+        .then(res => res.json())
+        .then(data => { if (data.status === 'success') setServerMembers(data.members); })
+        .catch(e => console.error("Members fetch error", e));
+
+      // Also fetch roles
+      fetch(`${getUrl(`/server/${selectedServer.id}/roles`)}`)
+        .then(res => res.json())
+        .then(data => { if (data.status === 'success') setServerRoles(data.roles); })
+        .catch(e => console.error("Roles fetch error", e));
+    }
+  };
+
   useEffect(() => {
     if (selectedServer && authState.token) {
-      const fetchMembers = () => {
-        fetch(`${getUrl(`/server/${selectedServer.id}/members`)}?token=${authState.token}`)
-          .then(res => res.json())
-          .then(data => { if (data.status === 'success') setServerMembers(data.members); })
-          .catch(e => console.error("Members fetch error", e));
-      };
-
       fetchMembers();
+
       const interval = setInterval(fetchMembers, 10000); // Poll members every 10s
 
       // Only auto-select first channel if no channel is currently selected
@@ -314,6 +392,8 @@ function App() {
     }
   }, [showSettings]);
 
+  const [userStatuses, setUserStatuses] = useState({}); // { [username]: 'online' | 'idle' | ... }
+
   // Connect to Lobby for Presence
   const connectToLobby = () => {
     if (lobbyWs.current) lobbyWs.current.close();
@@ -325,7 +405,27 @@ function App() {
         const data = JSON.parse(event.data);
         if (data.type === 'lobby_update') {
           setTotalUsers(data.total_online);
-          setOnlineUserIds(data.online_users || []);
+
+          // Handle new object-based online_users
+          const onlineUsersRaw = data.online_users || [];
+          const ids = [];
+          const statuses = {};
+
+          if (onlineUsersRaw.length > 0 && typeof onlineUsersRaw[0] === 'object') {
+            onlineUsersRaw.forEach(u => {
+              if (u.status === 'invisible' && u.username !== uuid.current) {
+                return;
+              }
+              ids.push(u.username);
+              statuses[u.username] = u.status;
+            });
+          } else {
+            // Fallback for string list (backward compatibility if needed)
+            onlineUsersRaw.forEach(u => ids.push(u));
+          }
+
+          setOnlineUserIds(ids);
+          setUserStatuses(prev => ({ ...prev, ...statuses }));
           setRoomDetails(data.room_details || {});
           // Refresh server list to get updated channels
           fetchServers();
@@ -1427,11 +1527,13 @@ function App() {
         friendRequests={friendRequests}
         friends={friends}
         onlineUserIds={onlineUserIds}
+        userStatuses={userStatuses}
         handleRespondRequest={handleRespondRequest}
         setShowAddFriend={setShowAddFriend}
         handleStartDM={handleStartDM}
         handleRemoveFriend={handleRemoveFriend}
         selectedServer={selectedServer}
+        serverMembers={serverMembers}
         setShowChannelCreateModal={setShowChannelCreateModal}
         handleChannelClick={handleChannelClick}
         setContextMenu={setContextMenu}
@@ -1452,6 +1554,8 @@ function App() {
         onToggleNoiseCancellation={toggleNoiseCancellation}
         onScreenShare={startScreenShare}
         stopScreenShare={stopScreenShare}
+        onStatusChange={handleStatusChange}
+        handleServerSettings={() => setShowServerSettings(true)}
       >
 
         {/* RESIZE HANDLE for Channel List */}
@@ -1533,9 +1637,18 @@ function App() {
               activeVoiceChannel={activeVoiceChannel}
             />
           ) : (
-            <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-              <h3>Hoşgeldin, Kaptan! 👋</h3>
-            </div>
+            /* FRIENDS DASHBOARD (HOME VIEW) */
+            <FriendsDashboard
+              friends={friends}
+              friendRequests={friendRequests}
+              onlineUserIds={onlineUserIds}
+              userStatuses={userStatuses}
+              handleRespondRequest={handleRespondRequest}
+              setShowAddFriend={setShowAddFriend}
+              handleStartDM={handleStartDM}
+              handleRemoveFriend={handleRemoveFriend}
+              handleAddFriend={(tag) => { setFriendInput(tag); handleAddFriend(); }}
+            />
           )
         )
         }
@@ -1629,25 +1742,81 @@ function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {serverMembers.map(m => {
-                const isOnline = onlineUserIds.includes(m.username);
-                const isMe = m.username === authState.user.username;
+              {(() => {
+                const online = [];
+                const offline = [];
+                serverMembers.forEach(m => {
+                  const isOnline = onlineUserIds.includes(m.username);
+                  if (isOnline) online.push(m);
+                  else offline.push(m);
+                });
+
+                const groups = {};
+                online.forEach(m => {
+                  // Try highest_role, fallback to 'Member' with default color
+                  const role = m.highest_role || { name: 'Üye', color: '#99AAB5', position: 0 };
+                  if (!groups[role.name]) groups[role.name] = { ...role, members: [] };
+                  groups[role.name].members.push(m);
+                });
+
+                // Sort groups by position DESC
+                const sortedGroups = Object.values(groups).sort((a, b) => b.position - a.position);
 
                 return (
-                  <div key={m.username} style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: isOnline ? 1 : 0.5 }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isOnline ? '#34C759' : '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px' }}>
-                      {m.username.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: isOnline ? 'bold' : 'normal', color: isOnline ? '#fff' : '#888' }}>
-                        {m.display_name} {isMe ? '(Sen)' : ''}
-                      </span>
-                      <span style={{ fontSize: '10px', color: '#666' }}>{m.role}</span>
-                    </div>
-                    {isOnline && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#34C759', marginLeft: 'auto' }}></div>}
-                  </div>
-                )
-              })}
+                  <>
+                    {sortedGroups.map(g => (
+                      <div key={g.name}>
+                        <div style={{ color: '#96989d', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '10px', marginTop: '10px' }}>
+                          {g.name} — {g.members.length}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {g.members.map(m => {
+                            const isMe = m.username === authState.user.username;
+                            const status = userStatuses[m.username] || 'online';
+                            // Status Colors: Online(Green), Idle(Yellow), DND(Red), Invisible(Gray)
+                            const statusColor = status === 'online' ? '#3ba55c' : (status === 'idle' ? '#faa61a' : (status === 'dnd' ? '#ed4245' : '#747f8d'));
+
+                            return (
+                              <div key={m.username} onContextMenu={(e) => handleUserContextMenu(e, m)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', transition: 'background-color 0.1s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: m.avatar_color || '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', position: 'relative' }}>
+                                  {m.avatar_url ? <img src={getUrl(m.avatar_url)} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : m.username.slice(0, 2).toUpperCase()}
+
+                                  {/* Status Dot */}
+                                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: statusColor, position: 'absolute', bottom: -2, right: -2, border: '2px solid #2f3136' }}></div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontWeight: '500', color: g.color }}>
+                                    {m.display_name}
+                                  </span>
+                                  {/* {isMe && <span style={{ fontSize: '10px', color: '#b9bbbe' }}>Sen</span>} */}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+
+                    {offline.length > 0 && (
+                      <div style={{ opacity: 0.5 }}>
+                        <div style={{ color: '#96989d', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '10px', marginTop: '20px' }}>
+                          ÇEVRİMDIŞI — {offline.length}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {offline.map(m => (
+                            <div key={m.username} onContextMenu={(e) => handleUserContextMenu(e, m)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', transition: 'background-color 0.1s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#36393f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px' }}>
+                                {m.avatar_url ? <img src={getUrl(m.avatar_url)} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : m.username.slice(0, 2).toUpperCase()}
+                              </div>
+                              <span style={{ color: '#72767d' }}>{m.display_name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
       </div >
@@ -1759,6 +1928,36 @@ function App() {
           </div>
         )
       }
+
+      {/* USER CONTEXT MENU */}
+      {userContextMenu && (
+        <div
+          style={{ position: 'fixed', top: userContextMenu.y, left: userContextMenu.x, background: '#18191c', borderRadius: '4px', padding: '8px', zIndex: 9999, boxShadow: '0 8px 16px rgba(0,0,0,0.24)', minWidth: '180px', border: '1px solid #2f3136' }}
+          onMouseLeave={() => setUserContextMenu(null)}
+        >
+          <div style={{ padding: '0 8px 8px 8px', color: '#b9bbbe', fontSize: '11px', fontWeight: 'bold', borderBottom: '1px solid #2f3136', marginBottom: '8px' }}>ROLLER</div>
+          {serverRoles.length > 0 ? serverRoles.map(r => {
+            const freshUser = serverMembers.find(m => m.user_id === userContextMenu.user.user_id) || userContextMenu.user;
+            const hasRole = freshUser.roles && freshUser.roles.includes(r.id);
+            return (
+              <div
+                key={r.id}
+                onClick={() => handleToggleRole(r.id, freshUser)}
+                style={{ display: 'flex', alignItems: 'center', padding: '6px 8px', cursor: 'pointer', borderRadius: '2px', color: '#b9bbbe', fontSize: '14px', transition: 'background-color 0.1s' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#5865F2'; e.currentTarget.style.color = '#fff' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#b9bbbe' }}
+              >
+                <div style={{ width: '16px', height: '16px', border: '1px solid #72767d', borderRadius: '3px', backgroundColor: hasRole ? r.color : 'transparent', marginRight: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {hasRole && <span style={{ fontSize: '10px', color: '#fff' }}>✓</span>}
+                </div>
+                {r.name}
+              </div>
+            )
+          }) : (
+            <div style={{ padding: '8px', color: '#72767d', fontSize: '12px', fontStyle: 'italic' }}>Hiç rol yok</div>
+          )}
+        </div>
+      )}
 
       {
         (showCreateServer || showJoinServer || showAddFriend) && ( /* MODALS */
@@ -2217,6 +2416,41 @@ function App() {
           </div>
         )
       }
+      {/* SERVER SETTINGS MODAL */}
+      {showServerSettings && selectedServer && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0f0f0f', display: 'flex', zIndex: 10000, overflow: 'hidden' }}>
+          <div style={{ width: '100vw', height: '100vh', display: 'flex', overflow: 'hidden' }}>
+            {/* Sidebar */}
+            <div style={{ width: '280px', backgroundColor: '#18191c', padding: '60px 20px 20px 40px', display: 'flex', flexDirection: 'column', flexShrink: 0, justifyContent: 'flex-start' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#aaa', marginBottom: '10px', paddingLeft: '10px' }}>SUNUCU AYARLARI</div>
+
+              <div style={{ padding: '6px 10px', marginBottom: '2px', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent', color: '#b9bbbe' }}>Genel Görünüm</div>
+              <div style={{ padding: '6px 10px', marginBottom: '2px', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff' }}>Roller</div>
+              <div style={{ padding: '6px 10px', marginBottom: '2px', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent', color: '#b9bbbe' }}>Emojiler</div>
+
+              <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                <div onClick={() => setShowServerSettings(false)} style={{ padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', color: '#aaa', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Geri Dön</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, padding: '60px 40px', overflowY: 'auto', backgroundColor: '#202225' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>Roller</h2>
+                <div onClick={() => setShowServerSettings(false)} style={{ cursor: 'pointer', padding: '10px 20px', border: '2px solid #aaa', borderRadius: '4px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', color: '#aaa', position: 'fixed', top: '60px', right: '40px', zIndex: 100 }}>
+                  <span>✕</span>
+                  <span style={{ fontSize: '14px', fontWeight: 'bold' }}>ESC</span>
+                </div>
+              </div>
+
+              <RoleSettings serverId={selectedServer.id} token={authState.token} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CONTEXT MENU */}
       {
         messageContextMenu && (
@@ -2252,6 +2486,8 @@ function App() {
           </div>
         )
       }
+
+
     </div >
   );
 }

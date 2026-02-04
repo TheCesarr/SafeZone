@@ -31,14 +31,14 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 
 ## Faz 3.6: PC İstemcisi (Web/React)
 - [x] Web Paneli Oluştur (React/Vite).
-- [x] "Forgot Password" functionality via 4-digit PIN
-- [x] Audio controls (Mute, Deafen)
-    - [x] Basic UI Buttons (Local Logic)
-    - [x] Sync Status with other users (Icons via WebSocket)
-- [x] Per-User Volume Control (Mesh Network Refactor)
-    - [x] Refactor WebRTC to use Map<UUID, PeerConnection>
-    - [x] Implement Targeted Signaling
-    - [x] Add Volume Sliders to User List
+- [x] "Şifremi Unuttum" özelliği (4 haneli PIN ile)
+- [x] Ses Kontrolleri (Sustur, Sağırlaştır)
+    - [x] Temel Arayüz Butonları (Yerel Mantık)
+    - [x] Durumun diğer kullanıcılarla senkronizasyonu (WebSocket İkonları)
+- [x] Kullanıcı Bazlı Ses Kontrolü (Mesh Ağı Düzenlemesi)
+    - [x] WebRTC'yi Map<UUID, PeerConnection> kullanacak şekilde düzenle
+    - [x] Hedefli Sinyalleşme Uygulaması
+    - [x] Kullanıcı Listesine Ses Ayarı Ekleme
 - [x] Dinamik Odaları Uygula (Lobi Sistemi).
 - [x] Arayüz Cilası (Minimalist Durum & Kullanıcı Sayıları).
 - [x] Masaüstü Uygulaması Olarak Paketle (Electron - Windows/Mac).

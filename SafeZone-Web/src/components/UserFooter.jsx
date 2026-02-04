@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { getUrl } from '../utils/api';
 
 const UserFooter = ({
@@ -15,12 +15,69 @@ const UserFooter = ({
     onToggleDeafen,
     onToggleNoiseCancellation,
     onScreenShare,
-    stopScreenShare
+    stopScreenShare,
+    onStatusChange
 }) => {
+    const [showStatusMenu, setShowStatusMenu] = useState(false);
+
     if (!authState || !authState.user) return <div style={{ padding: '10px', backgroundColor: '#0f0f0f', borderTop: '1px solid #222', color: '#666', fontSize: '12px' }}>Yükleniyor...</div>;
 
+    const currentStatus = authState.user.status || 'online';
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'online': return '#3BA55C'; // Green
+            case 'idle': return '#FAA61A';   // Yellow
+            case 'dnd': return '#ED4245';    // Red
+            case 'invisible': return '#747F8D'; // Grey
+            default: return '#3BA55C';
+        }
+    };
+
+    const handleStatusClick = (status) => {
+        if (onStatusChange) onStatusChange(status);
+        setShowStatusMenu(false);
+    };
+
     return (
-        <div style={{ padding: '10px', backgroundColor: '#0f0f0f', borderTop: '1px solid #222' }}>
+        <div style={{ padding: '10px', backgroundColor: '#0f0f0f', borderTop: '1px solid #222', position: 'relative' }}>
+
+            {/* Status Menu Popover */}
+            {showStatusMenu && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '60px',
+                    left: '10px',
+                    backgroundColor: '#18191C',
+                    border: '1px solid #2f3136',
+                    borderRadius: '4px',
+                    padding: '5px',
+                    zIndex: 1000,
+                    width: '200px',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+                }}>
+                    <div style={{ padding: '5px', color: '#b9bbbe', fontSize: '12px', fontWeight: 'bold' }}>DURUM AYARLA</div>
+                    <div onClick={() => handleStatusClick('online')} style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#dcddde', borderRadius: '3px', transition: '0.2s' }} onMouseEnter={(e) => e.target.style.background = '#40444b'} onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3BA55C' }}></div>
+                        Çevrimiçi
+                    </div>
+                    <div onClick={() => handleStatusClick('idle')} style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#dcddde', borderRadius: '3px', transition: '0.2s' }} onMouseEnter={(e) => e.target.style.background = '#40444b'} onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#FAA61A' }}></div>
+                        Boşta
+                    </div>
+                    <div onClick={() => handleStatusClick('dnd')} style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#dcddde', borderRadius: '3px', transition: '0.2s' }} onMouseEnter={(e) => e.target.style.background = '#40444b'} onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ED4245' }}></div>
+                        Rahatsız Etmeyin
+                    </div>
+                    <div onClick={() => handleStatusClick('invisible')} style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#dcddde', borderRadius: '3px', transition: '0.2s' }} onMouseEnter={(e) => e.target.style.background = '#40444b'} onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#747F8D' }}></div>
+                        Görünmez
+                    </div>
+                </div>
+            )}
+            {/* Status Menu Overlay (Click outside to close) */}
+            {showStatusMenu && <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 999 }} onClick={() => setShowStatusMenu(false)}></div>}
+
 
             {/* 1. Voice Connection Status Panel */}
             {activeVoiceChannel && (
@@ -35,13 +92,31 @@ const UserFooter = ({
 
             {/* 2. User Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '32px', minWidth: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#34C759', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', overflow: 'hidden', flexShrink: 0 }}>
-                    {authState.user.avatar_url ? (
-                        <img src={`${getUrl(authState.user.avatar_url)}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                        authState.user.username.slice(0, 2).toUpperCase()
-                    )}
+                {/* Avatar with Status Indicator */}
+                <div
+                    onClick={() => setShowStatusMenu(!showStatusMenu)}
+                    style={{ position: 'relative', cursor: 'pointer' }}
+                >
+                    <div style={{ width: '32px', minWidth: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#34C759', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', overflow: 'hidden', flexShrink: 0 }}>
+                        {authState.user.avatar_url ? (
+                            <img src={`${getUrl(authState.user.avatar_url)}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            authState.user.username.slice(0, 2).toUpperCase()
+                        )}
+                    </div>
+                    {/* Status Dot */}
+                    <div style={{
+                        position: 'absolute',
+                        bottom: -2,
+                        right: -2,
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        backgroundColor: getStatusColor(currentStatus),
+                        border: '2px solid #0f0f0f'
+                    }}></div>
                 </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, paddingRight: '10px', overflow: 'hidden' }}>
                     <span style={{ fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', display: 'block', overflow: 'hidden' }}>{authState.user.username}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>

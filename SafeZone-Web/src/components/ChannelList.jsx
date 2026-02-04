@@ -13,6 +13,8 @@ const ChannelList = ({
     handleStartDM,
     handleRemoveFriend,
     selectedServer,
+    handleServerSettings,
+    serverMembers,
     setShowChannelCreateModal,
     handleChannelClick,
     setContextMenu,
@@ -34,6 +36,7 @@ const ChannelList = ({
     onToggleNoiseCancellation,
     onScreenShare,
     stopScreenShare,
+    onStatusChange,
     children
 }) => {
     return (
@@ -94,7 +97,18 @@ const ChannelList = ({
                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                                             {friend.username.slice(0, 2).toUpperCase()}
                                             {onlineUserIds.includes(friend.username) && (
-                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#34C759', position: 'absolute', bottom: '-2px', right: '-2px', border: '2px solid #1e1e1e' }}></div>
+                                                <div style={{
+                                                    width: '10px',
+                                                    height: '10px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: userStatuses[friend.username] === 'idle' ? '#FAA61A' :
+                                                        (userStatuses[friend.username] === 'dnd' ? '#ED4245' :
+                                                            (userStatuses[friend.username] === 'invisible' ? '#747F8D' : '#34C759')),
+                                                    position: 'absolute',
+                                                    bottom: '-2px',
+                                                    right: '-2px',
+                                                    border: '2px solid #1e1e1e'
+                                                }}></div>
                                             )}
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -140,6 +154,7 @@ const ChannelList = ({
                         onToggleNoiseCancellation={onToggleNoiseCancellation}
                         onScreenShare={onScreenShare}
                         stopScreenShare={stopScreenShare}
+                        onStatusChange={onStatusChange}
                     />
                 </>
             ) : selectedServer ? (
@@ -149,13 +164,22 @@ const ChannelList = ({
                             <div style={{ fontWeight: 'bold', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedServer.name}</div>
                             <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>CODE: {selectedServer.invite_code}</div>
                         </div>
-                        <button
-                            onClick={() => setShowChannelCreateModal(true)}
-                            title="Kanal Ekle"
-                            style={{ background: 'none', border: 'none', color: '#34C759', fontSize: '20px', cursor: 'pointer', padding: '5px' }}
-                        >
-                            +
-                        </button>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <button
+                                onClick={handleServerSettings}
+                                title="Sunucu Ayarları (Roller)"
+                                style={{ background: 'none', border: 'none', color: '#b9bbbe', fontSize: '16px', cursor: 'pointer', padding: '5px' }}
+                            >
+                                ⚙️
+                            </button>
+                            <button
+                                onClick={() => setShowChannelCreateModal(true)}
+                                title="Kanal Ekle"
+                                style={{ background: 'none', border: 'none', color: '#34C759', fontSize: '20px', cursor: 'pointer', padding: '5px' }}
+                            >
+                                +
+                            </button>
+                        </div>
                     </div>
 
                     <div style={{ flexGrow: 1, padding: '10px', overflowY: 'auto' }}>
@@ -238,6 +262,7 @@ const ChannelList = ({
                         onToggleNoiseCancellation={onToggleNoiseCancellation}
                         onScreenShare={onScreenShare}
                         stopScreenShare={stopScreenShare}
+                        onStatusChange={onStatusChange}
                     />
                 </>
             ) : (
@@ -258,6 +283,7 @@ const ChannelList = ({
                         onToggleNoiseCancellation={onToggleNoiseCancellation}
                         onScreenShare={onScreenShare}
                         stopScreenShare={stopScreenShare}
+                        onStatusChange={onStatusChange}
                     />
                 </div>
             )}
