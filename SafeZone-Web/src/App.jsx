@@ -971,6 +971,11 @@ function App() {
       disconnectVoice();
     }
 
+    // Get Media FIRST to avoid Race Condition (User joins before stream is ready -> No Audio Sent)
+    if (channel.type === 'voice') {
+      await startVoiceMedia(channel);
+    }
+
     const wsUrl = getUrl(`/ws/room/${channel.id}/${uuid.current}`, 'ws');
     roomWs.current = new WebSocket(wsUrl);
 
@@ -984,11 +989,6 @@ function App() {
       }
     }
     roomWs.current.onmessage = handleVoiceMessage;
-
-    // If Voice, also get Media
-    if (channel.type === 'voice') {
-      startVoiceMedia(channel);
-    }
   }
 
   const startVoiceMedia = async (channel) => {

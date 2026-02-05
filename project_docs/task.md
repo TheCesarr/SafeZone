@@ -120,4 +120,5 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Düşük gecikme için Türkiye lokasyonlu VDS Kirala (Rabisu/Keyubu - <10ms ping).
 - [x] Backend & Web Sunucusunu VDS'e Taşı.
 - [x] Dağıtım İş Akışını Kur (GitHub'a Aktarım Hazırlandı).
+- [x] VDS için Kritik Düzeltmeler (Ses Yarış Durumu & Çift Mesaj).
 - [ ] Alan Adı (Domain) & SSL (Let's Encrypt) Kurulumu (Production için).
