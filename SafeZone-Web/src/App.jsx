@@ -993,23 +993,11 @@ function App() {
 
   const startVoiceMedia = async (channel) => {
     try {
-      // Apply saved noise cancellation preference on start
-      const savedNoise = localStorage.getItem('safezone_noise_cancel') === 'true';
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: savedNoise ? {
-          // Advanced noise cancellation (Discord Krisp-like)
-          noiseSuppression: { ideal: true },
-          echoCancellation: { ideal: true },
-          autoGainControl: { ideal: true },
-          // Additional constraints for better noise filtering
-          sampleRate: { ideal: 48000 },
-          channelCount: { ideal: 1 },
-          latency: { ideal: 0.01 }
-        } : {
-          // Basic audio without noise cancellation
-          noiseSuppression: false,
-          echoCancellation: false,
-          autoGainControl: false
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         },
         video: false
       })
