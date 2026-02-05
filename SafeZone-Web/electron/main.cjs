@@ -4,6 +4,8 @@ const path = require('path');
 // Ignore SSL errors (MANDATORY for Self-Signed Certs)
 app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('allow-insecure-localhost', 'true');
+// Allow Microphone/Camera on HTTP for VDS IP
+app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', 'http://31.57.156.201');
 app.disableHardwareAcceleration();
 
 // Forcefully accept all certificates (Critical for WSS connection)

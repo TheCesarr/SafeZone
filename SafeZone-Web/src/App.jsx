@@ -1354,15 +1354,7 @@ function App() {
       roomWs.current.send(JSON.stringify(msg))
     }
 
-    // Optimistic Local Update (Object format)
-    setMessages(prev => [...prev, {
-      sender: authState.user.username,
-      text: inputText,
-      attachment_url: attachment?.url,
-      attachment_type: attachment?.type,
-      attachment_name: attachment?.name,
-      timestamp: new Date().toISOString()
-    }])
+
 
 
     setInputText("")

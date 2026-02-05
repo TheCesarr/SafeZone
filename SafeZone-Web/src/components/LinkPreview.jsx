@@ -6,7 +6,7 @@ const LinkPreview = ({ url }) => {
 
     useEffect(() => {
         // Determine API URL based on environment
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+        const API_URL = getUrl('');
 
         // Check if token exists in localStorage (rudimentary auth check)
         const token = localStorage.getItem('safezone_token');
