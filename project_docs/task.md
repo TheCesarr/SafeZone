@@ -117,7 +117,7 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Codebase Temizliği (Imports & Unused Code).
 
 ## Faz 5: Altyapı & Büyüme (Gelecek)
-- [ ] Düşük gecikme için Türkiye lokasyonlu VDS Kirala (Rabisu/Keyubu - <10ms ping).
+- [x] Düşük gecikme için Türkiye lokasyonlu VDS Kirala (Rabisu/Keyubu - <10ms ping).
 - [ ] Backend & Web Sunucusunu VDS'e Taşı.
 - [x] Dağıtım İş Akışını Kur (GitHub'a Aktarım Hazırlandı).
 - [ ] Alan Adı (Domain) & SSL (Let's Encrypt) Kurulumu (Production için).

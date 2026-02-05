@@ -1859,4 +1859,4 @@ if __name__ == "__main__":
     print("   (Loglar server_log.txt dosyasina kaydediliyor)")
     print("============================================")
     # SSL KALDIRILDI - SSH TUNEL ICIN HTTP GEREKLI
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="warning", reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="warning", reload=False)

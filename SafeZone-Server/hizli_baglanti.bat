@@ -21,7 +21,7 @@ echo PENCEREYI KAPATMA! BAGLANDI...
 echo ========================================================
 echo.
 
-ssh -o StrictHostKeyChecking=no -R 80:localhost:8000 nokey@localhost.run
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL -R 80:localhost:8000 serveo.net
 
 echo.
 echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -43,7 +43,7 @@ function createWindow() {
     win.once('ready-to-show', () => {
         win.show();
         // Open DevTools to debug black screen
-        // win.webContents.openDevTools();
+        win.webContents.openDevTools();
     });
 
     // Retry logic for dev server startup race condition
