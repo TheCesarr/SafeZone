@@ -38,6 +38,7 @@ const ChannelList = ({
     onScreenShare,
     stopScreenShare,
     onStatusChange,
+    userStatuses,
     children
 }) => {
     return (
@@ -51,14 +52,14 @@ const ChannelList = ({
                     {/* PENDING REQUESTS SECTION */}
                     {friendRequests.length > 0 && (
                         <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', margin: '10px', borderRadius: '8px', boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.2)' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#aaa', marginBottom: '8px' }}>GELEN İSTEKLER ({friendRequests.length})</div>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: colors?.textMuted || '#aaa', marginBottom: '8px' }}>GELEN İSTEKLER ({friendRequests.length})</div>
                             {friendRequests.map(req => (
                                 <div key={req.username} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
                                             {req.username.slice(0, 2).toUpperCase()}
                                         </div>
-                                        <span style={{ fontSize: '12px' }}>{req.username}</span>
+                                        <span style={{ fontSize: '12px', color: colors?.text || '#fff' }}>{req.username}</span>
                                     </div>
                                     <div style={{ display: 'flex', gap: '5px' }}>
                                         <button onClick={() => handleRespondRequest(req.username, 'accept')} style={{ border: 'none', background: '#34C759', color: '#fff', borderRadius: '3px', cursor: 'pointer', padding: '2px 6px' }}>✓</button>
@@ -87,7 +88,7 @@ const ChannelList = ({
                         </div>
 
                         {friends.length === 0 ? (
-                            <div style={{ padding: '20px', color: '#666', textAlign: 'center' }}>
+                            <div style={{ padding: '20px', color: colors?.textMuted || '#666', textAlign: 'center' }}>
                                 <p>Henüz arkadaşın yok!</p>
                                 <p style={{ fontSize: '12px' }}>Arkadaş ekle butonuna tıkla.</p>
                             </div>
@@ -102,9 +103,9 @@ const ChannelList = ({
                                                     width: '10px',
                                                     height: '10px',
                                                     borderRadius: '50%',
-                                                    backgroundColor: userStatuses[friend.username] === 'idle' ? '#FAA61A' :
-                                                        (userStatuses[friend.username] === 'dnd' ? '#ED4245' :
-                                                            (userStatuses[friend.username] === 'invisible' ? '#747F8D' : '#34C759')),
+                                                    backgroundColor: userStatuses?.[friend.username] === 'idle' ? '#FAA61A' :
+                                                        (userStatuses?.[friend.username] === 'dnd' ? '#ED4245' :
+                                                            (userStatuses?.[friend.username] === 'invisible' ? '#747F8D' : '#34C759')),
                                                     position: 'absolute',
                                                     bottom: '-2px',
                                                     right: '-2px',
@@ -113,10 +114,10 @@ const ChannelList = ({
                                             )}
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontWeight: onlineUserIds.includes(friend.username) ? 'bold' : 'normal', color: onlineUserIds.includes(friend.username) ? '#fff' : '#aaa' }}>
+                                            <span style={{ fontWeight: onlineUserIds.includes(friend.username) ? 'bold' : 'normal', color: onlineUserIds.includes(friend.username) ? (colors?.text || '#fff') : (colors?.textMuted || '#aaa') }}>
                                                 {friend.display_name || friend.username}
                                             </span>
-                                            <span style={{ fontSize: '10px', color: '#666' }}>#{friend.discriminator}</span>
+                                            <span style={{ fontSize: '10px', color: colors?.textMuted || '#666' }}>#{friend.discriminator}</span>
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '5px' }}>
@@ -156,20 +157,21 @@ const ChannelList = ({
                         onScreenShare={onScreenShare}
                         stopScreenShare={stopScreenShare}
                         onStatusChange={onStatusChange}
+                        colors={colors}
                     />
                 </>
             ) : selectedServer ? (
                 <>
-                    <div style={{ padding: '20px', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '57px', boxSizing: 'border-box' }}>
+                    <div style={{ padding: '20px', borderBottom: `1px solid ${colors?.border || '#222'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '57px', boxSizing: 'border-box' }}>
                         <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedServer.name}</div>
-                            <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>CODE: {selectedServer.invite_code}</div>
+                            <div style={{ fontWeight: 'bold', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: colors?.text || '#fff' }}>{selectedServer.name}</div>
+                            <div style={{ fontSize: '10px', color: colors?.textMuted || '#666', marginTop: '4px' }}>CODE: {selectedServer.invite_code}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '5px' }}>
                             <button
                                 onClick={handleServerSettings}
                                 title="Sunucu Ayarları (Roller)"
-                                style={{ background: 'none', border: 'none', color: '#b9bbbe', fontSize: '16px', cursor: 'pointer', padding: '5px' }}
+                                style={{ background: 'none', border: 'none', color: colors?.textMuted || '#b9bbbe', fontSize: '16px', cursor: 'pointer', padding: '5px' }}
                             >
                                 ⚙️
                             </button>
@@ -194,8 +196,8 @@ const ChannelList = ({
                                     }}
                                     style={{
                                         padding: '10px', marginBottom: '2px', borderRadius: '6px',
-                                        backgroundColor: selectedChannel?.id === ch.id ? '#333' : 'transparent',
-                                        color: selectedChannel?.id === ch.id ? '#fff' : (activeVoiceChannel?.id === ch.id ? '#34C759' : '#888'),
+                                        backgroundColor: selectedChannel?.id === ch.id ? (colors?.cardHover || '#333') : 'transparent',
+                                        color: selectedChannel?.id === ch.id ? (colors?.text || '#fff') : (activeVoiceChannel?.id === ch.id ? '#34C759' : (colors?.textMuted || '#888')),
                                         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
                                         overflow: 'hidden'
                                     }}
@@ -227,7 +229,7 @@ const ChannelList = ({
                                                     }}>
                                                         {uid.slice(0, 1).toUpperCase()}
                                                     </div>
-                                                    <span style={{ fontSize: '11px', color: '#aaa' }}>{uid}</span>
+                                                    <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa' }}>{uid}</span>
                                                     {/* Show mute/deafen icons for all users */}
                                                     {(() => {
                                                         const userVoiceState = isCurrentUser ? { isMuted, isDeafened, isScreenSharing } : (voiceStates[uid] || {});
@@ -264,10 +266,11 @@ const ChannelList = ({
                         onScreenShare={onScreenShare}
                         stopScreenShare={stopScreenShare}
                         onStatusChange={onStatusChange}
+                        colors={colors}
                     />
                 </>
             ) : (
-                <div style={{ padding: '20px', color: '#666', textAlign: 'center', marginTop: '50px' }}>
+                <div style={{ padding: '20px', color: colors?.textMuted || '#666', textAlign: 'center', marginTop: '50px' }}>
                     <p>Bir sunucu seçin veya oluşturun.</p>
                     <UserFooter
                         authState={authState}
@@ -285,6 +288,7 @@ const ChannelList = ({
                         onScreenShare={onScreenShare}
                         stopScreenShare={stopScreenShare}
                         onStatusChange={onStatusChange}
+                        colors={colors}
                     />
                 </div>
             )}

@@ -32,38 +32,46 @@ const FriendsDashboard = ({
     setShowAddFriend,
     handleStartDM,
     handleRemoveFriend,
-    handleAddFriend // New prop for Search/Add
+    handleAddFriend, // New prop for Search/Add
+    colors
 }) => {
     const [activeTab, setActiveTab] = useState('online'); // online, all, pending, blocked, add_friend
     const [addFriendInput, setAddFriendInput] = useState('');
 
     // Filter Logic
-    const onlineFriends = friends.filter(f => onlineUserIds.includes(f.username) && userStatuses[f.username] !== 'invisible');
-    const allFriends = friends;
-    const pendingRequests = friendRequests;
+    const safeFriends = friends || [];
+    const onlineFriends = safeFriends.filter(f => onlineUserIds.includes(f.username) && userStatuses[f.username] !== 'invisible');
+    const allFriends = safeFriends;
+    const pendingRequests = friendRequests || [];
+
+    const bgColor = colors?.background || '#36393f';
+    const textColor = colors?.text || '#fff';
+    const mutedColor = colors?.textMuted || '#b9bbbe';
+    const borderColor = colors?.border || 'rgba(255,255,255,0.05)';
+    const hoverColor = colors?.cardHover || 'rgba(79, 84, 92, 0.16)';
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#36393f', height: '100%' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: bgColor, height: '100%', color: textColor }}>
 
             {/* TOP BAR */}
             <div style={{
                 height: '48px',
-                borderBottom: '1px solid rgba(0,0,0,0.2)',
+                borderBottom: `1px solid ${borderColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 padding: '0 20px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '20px', color: '#fff', fontWeight: 'bold' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '20px', color: textColor, fontWeight: 'bold' }}>
                     <span style={{ color: '#8e9297' }}>👋</span>
                     Friends
                 </div>
-                <div style={{ width: '1px', height: '24px', backgroundColor: '#42454a', marginRight: '20px' }}></div>
+                <div style={{ width: '1px', height: '24px', backgroundColor: borderColor, marginRight: '20px' }}></div>
 
                 <div style={{ display: 'flex', gap: '20px', fontSize: '14px' }}>
-                    <div onClick={() => setActiveTab('online')} style={{ cursor: 'pointer', color: activeTab === 'online' ? '#fff' : '#b9bbbe', fontWeight: activeTab === 'online' ? 'bold' : 'normal', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'online' ? 'rgba(255,255,255,0.1)' : 'transparent' }}>Çevrimiçi</div>
-                    <div onClick={() => setActiveTab('all')} style={{ cursor: 'pointer', color: activeTab === 'all' ? '#fff' : '#b9bbbe', fontWeight: activeTab === 'all' ? 'bold' : 'normal', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent' }}>Tümü</div>
-                    <div onClick={() => setActiveTab('pending')} style={{ cursor: 'pointer', color: activeTab === 'pending' ? '#fff' : '#b9bbbe', fontWeight: activeTab === 'pending' ? 'bold' : 'normal', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'pending' ? 'rgba(255,255,255,0.1)' : 'transparent' }}>
+                    <div onClick={() => setActiveTab('online')} style={{ cursor: 'pointer', color: activeTab === 'online' ? textColor : mutedColor, fontWeight: activeTab === 'online' ? 'bold' : 'normal', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'online' ? 'rgba(255,255,255,0.1)' : 'transparent' }}>Çevrimiçi</div>
+                    <div onClick={() => setActiveTab('all')} style={{ cursor: 'pointer', color: activeTab === 'all' ? textColor : mutedColor, fontWeight: activeTab === 'all' ? 'bold' : 'normal', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent' }}>Tümü</div>
+                    <div onClick={() => setActiveTab('pending')} style={{ cursor: 'pointer', color: activeTab === 'pending' ? textColor : mutedColor, fontWeight: activeTab === 'pending' ? 'bold' : 'normal', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'pending' ? 'rgba(255,255,255,0.1)' : 'transparent' }}>
                         Bekleyen {pendingRequests.length > 0 && <span style={{ marginLeft: '5px', backgroundColor: '#ED4245', color: 'white', borderRadius: '50%', padding: '0 5px', fontSize: '10px' }}>{pendingRequests.length}</span>}
                     </div>
                     <div onClick={() => setActiveTab('add_friend')} style={{ cursor: 'pointer', color: activeTab === 'add_friend' ? '#2dc770' : '#2dc770', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', backgroundColor: activeTab === 'add_friend' ? 'rgba(0,0,0,0.1)' : 'transparent' }}>Arkadaş Ekle</div>
@@ -75,14 +83,14 @@ const FriendsDashboard = ({
 
                 {activeTab === 'add_friend' && (
                     <div style={{ maxWidth: '600px' }}>
-                        <h2 style={{ color: '#fff', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>ARKADAŞ EKLE</h2>
-                        <div style={{ fontSize: '12px', color: '#b9bbbe', marginBottom: '20px' }}>Kullanıcı adıyla arkadaş ekleyebilirsin (#0000 etiketini unutma!).</div>
-                        <div style={{ display: 'flex', gap: '10px', height: '50px', backgroundColor: '#00000010', borderRadius: '8px', border: '1px solid #00000030', padding: '0 15px', alignItems: 'center' }}>
+                        <h2 style={{ color: textColor, fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>ARKADAŞ EKLE</h2>
+                        <div style={{ fontSize: '12px', color: mutedColor, marginBottom: '20px' }}>Kullanıcı adıyla arkadaş ekleyebilirsin (#0000 etiketini unutma!).</div>
+                        <div style={{ display: 'flex', gap: '10px', height: '50px', backgroundColor: colors?.card || '#00000010', borderRadius: '8px', border: `1px solid ${borderColor}`, padding: '0 15px', alignItems: 'center' }}>
                             <input
                                 value={addFriendInput}
                                 onChange={(e) => setAddFriendInput(e.target.value)}
                                 placeholder="KullanıcıAdı#0000"
-                                style={{ flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: '16px', outline: 'none' }}
+                                style={{ flex: 1, background: 'transparent', border: 'none', color: textColor, fontSize: '16px', outline: 'none' }}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAddFriend(addFriendInput)}
                             />
                             <button
@@ -104,14 +112,14 @@ const FriendsDashboard = ({
                         {/* Wumpus Image Placeholder */}
                         <div style={{ marginTop: '50px', textAlign: 'center', opacity: 0.5 }}>
                             <div style={{ fontSize: '40px', marginBottom: '10px' }}>🏞️</div>
-                            <div style={{ color: '#72767d' }}>Arkadaşlarını bulmak için bekleme, eklemeye başla!</div>
+                            <div style={{ color: mutedColor }}>Arkadaşlarını bulmak için bekleme, eklemeye başla!</div>
                         </div>
                     </div>
                 )}
 
                 {(activeTab === 'online' || activeTab === 'all') && (
                     <div>
-                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#b9bbbe', marginBottom: '20px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: mutedColor, marginBottom: '20px' }}>
                             {activeTab === 'online' ? `ÇEVRİMİÇİ — ${onlineFriends.length}` : `TÜM ARKADAŞLAR — ${allFriends.length}`}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -127,11 +135,11 @@ const FriendsDashboard = ({
                                         alignItems: 'center',
                                         padding: '10px',
                                         borderRadius: '8px',
-                                        borderTop: '1px solid rgba(255,255,255,0.05)',
+                                        borderTop: `1px solid ${borderColor}`,
                                         cursor: 'pointer'
                                     }}
                                         className="friend-item-hover"
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(79, 84, 92, 0.16)'}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = hoverColor}
                                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                         onClick={() => handleStartDM(friend)}
                                     >
@@ -141,21 +149,21 @@ const FriendsDashboard = ({
                                                     {friend.username.slice(0, 2).toUpperCase()}
                                                 </div>
                                                 <div style={{
-                                                    width: '10px', height: '10px', borderRadius: '50%', position: 'absolute', bottom: -2, right: -2, border: '2px solid #36393f',
+                                                    width: '10px', height: '10px', borderRadius: '50%', position: 'absolute', bottom: -2, right: -2, border: `2px solid ${bgColor}`,
                                                     backgroundColor: getStatusColor(status)
                                                 }}></div>
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <div style={{ color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                <div style={{ color: textColor, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                     {friend.display_name || friend.username}
-                                                    <span style={{ fontSize: '12px', color: '#b9bbbe', fontWeight: 'normal', opacity: 0 }}>#{friend.discriminator}</span>
+                                                    <span style={{ fontSize: '12px', color: mutedColor, fontWeight: 'normal', opacity: 0 }}>#{friend.discriminator}</span>
                                                 </div>
-                                                <div style={{ fontSize: '11px', color: '#b9bbbe' }}>{getStatusText(status)}</div>
+                                                <div style={{ fontSize: '11px', color: mutedColor }}>{getStatusText(status)}</div>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '10px' }}>
-                                            <div title="Mesaj" style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b9bbbe', cursor: 'pointer' }}>💬</div>
-                                            <div title="Diğer" onClick={(e) => { e.stopPropagation(); handleRemoveFriend(friend.username); }} style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ed4245', cursor: 'pointer' }}>🗑️</div>
+                                            <div title="Mesaj" style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: colors?.card || '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: mutedColor, cursor: 'pointer' }}>💬</div>
+                                            <div title="Diğer" onClick={(e) => { e.stopPropagation(); handleRemoveFriend(friend.username); }} style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: colors?.card || '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ed4245', cursor: 'pointer' }}>🗑️</div>
                                         </div>
                                     </div>
                                 );
@@ -166,16 +174,16 @@ const FriendsDashboard = ({
 
                 {activeTab === 'pending' && (
                     <div>
-                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#b9bbbe', marginBottom: '20px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: mutedColor, marginBottom: '20px' }}>
                             BEKLEYEN İSTEKLER — {pendingRequests.length}
                         </div>
                         {pendingRequests.map(req => (
-                            <div key={req.username} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderRadius: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div key={req.username} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderRadius: '8px', borderTop: `1px solid ${borderColor}` }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                                         {req.username.slice(0, 2).toUpperCase()}
                                     </div>
-                                    <div style={{ color: '#fff', fontWeight: 'bold' }}>{req.username}</div>
+                                    <div style={{ color: textColor, fontWeight: 'bold' }}>{req.username}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px' }}>
                                     <button onClick={() => handleRespondRequest(req.username, 'accept')} style={{ padding: '8px', backgroundColor: 'transparent', border: 'none', color: '#3ba55c', cursor: 'pointer', fontSize: '16px' }}>✔️</button>

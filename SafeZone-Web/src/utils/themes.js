@@ -23,31 +23,31 @@ const themes = {
     // ========== MIDNIGHT PURPLE ==========
     midnight: {
         dark: {
-            background: '#1A0F26',        // Koyu Mor Arka Plan
-            sidebar: '#2D1B3D',           // Sidebar/Sol Panel
-            card: '#3D2555',              // Kartlar/Mesaj Kutuları
-            cardHover: '#4A2E66',         // Hover durumu
-            accent: '#8B5CF6',            // Vurgu/Butonlar
-            accentHover: '#7C3AED',       // Buton Hover
-            text: '#E9D5FF',              // Ana Metin
-            textSecondary: '#C4B5FD',     // İkincil Metin
-            textMuted: '#A78BFA',         // Soluk Metin
-            border: '#4A2E66',            // Çizgiler
-            success: '#10B981',           // Yeşil (Başarı)
-            error: '#EF4444',             // Kırmızı (Hata)
-            warning: '#F59E0B'            // Turuncu (Uyarı)
+            background: '#1A0F26',
+            sidebar: '#2D1B3D',
+            card: '#3D2555',
+            cardHover: '#4A2E66',
+            accent: '#8B5CF6',
+            accentHover: '#7C3AED',
+            text: '#E9D5FF',
+            textSecondary: '#C4B5FD',
+            textMuted: '#A78BFA',
+            border: '#4A2E66',
+            success: '#10B981',
+            error: '#EF4444',
+            warning: '#F59E0B'
         },
         light: {
-            background: '#F5F3FF',        // Açık Lavanta Arka Plan
-            sidebar: '#EDE9FE',           // Sidebar
-            card: '#FFFFFF',              // Kartlar
-            cardHover: '#F3F0FF',         // Hover
-            accent: '#7C3AED',            // Vurgu
-            accentHover: '#6D28D9',       // Hover
-            text: '#1F1729',              // Ana Metin (Koyu)
-            textSecondary: '#4C1D95',     // İkincil
-            textMuted: '#7C3AED',         // Soluk
-            border: '#DDD6FE',            // Çizgiler
+            background: '#D3CDE0',        // Darker Lavender
+            sidebar: '#C5BFE0',           // Muted Purple
+            card: '#E8E4F0',              // Soft Lavender
+            cardHover: '#DCD6E8',
+            accent: '#4C1D95',            // Deep Violet (Darker)
+            accentHover: '#3B0764',       // Violet Black
+            text: '#0F0E14',              // Near Black
+            textSecondary: '#3B0764',     // Dark Purple
+            textMuted: '#4B5563',         // Dark Gray
+            border: '#B39DDB',            // Slightly Darker Border
             success: '#059669',
             error: '#DC2626',
             warning: '#D97706'
@@ -57,31 +57,31 @@ const themes = {
     // ========== OCEAN BLUE ==========
     ocean: {
         dark: {
-            background: '#061E28',        // Derin Deniz
-            sidebar: '#0F3443',           // Okyanus
-            card: '#1A4D5E',              // Turkuaz Kart
-            cardHover: '#236179',         // Hover
-            accent: '#06B6D4',            // Cyan Vurgu
-            accentHover: '#0891B2',       // Hover
-            text: '#CFFAFE',              // Açık Cyan Metin
-            textSecondary: '#A5F3FC',     // İkincil
-            textMuted: '#67E8F9',         // Soluk
-            border: '#236179',            // Çizgi
+            background: '#061E28',
+            sidebar: '#0F3443',
+            card: '#1A4D5E',
+            cardHover: '#236179',
+            accent: '#06B6D4',
+            accentHover: '#0891B2',
+            text: '#CFFAFE',
+            textSecondary: '#A5F3FC',
+            textMuted: '#67E8F9',
+            border: '#236179',
             success: '#10B981',
             error: '#EF4444',
             warning: '#F59E0B'
         },
         light: {
-            background: '#EFF6FF',        // Açık Gökyüzü
-            sidebar: '#DBEAFE',           // Sidebar
-            card: '#FFFFFF',              // Beyaz Kart
-            cardHover: '#E0F2FE',         // Hover
-            accent: '#0284C7',            // Sky Blue Vurgu
-            accentHover: '#0369A1',       // Hover
-            text: '#0C2433',              // Koyu Metin
-            textSecondary: '#075985',     // İkincil
-            textMuted: '#0284C7',         // Soluk
-            border: '#BAE6FD',            // Çizgi
+            background: '#C9D8E2',        // Darker Blue-Grey
+            sidebar: '#BCCCD9',
+            card: '#E2EDF2',              // Soft Blue-White
+            cardHover: '#D4E3EA',
+            accent: '#0C4A6E',            // Deep Ocean Blue (Darker)
+            accentHover: '#082F49',       // Navy Black
+            text: '#020617',              // Near Black
+            textSecondary: '#0C4A6E',     // Navy
+            textMuted: '#334155',         // Dark Slate
+            border: '#90A4AE',            // Darker Border
             success: '#059669',
             error: '#DC2626',
             warning: '#D97706'
@@ -91,31 +91,31 @@ const themes = {
     // ========== FOREST GREEN ==========
     forest: {
         dark: {
-            background: '#0D2319',        // Koyu Orman
-            sidebar: '#1A3A2E',           // Zümrüt
-            card: '#245240',              // Yeşil Kart
-            cardHover: '#2D6650',         // Hover
-            accent: '#10B981',            // Canlı Yeşil
-            accentHover: '#059669',       // Hover
-            text: '#D1FAE5',              // Açık Yeşil Metin
-            textSecondary: '#A7F3D0',     // İkincil
-            textMuted: '#6EE7B7',         // Soluk
-            border: '#2D6650',            // Çizgi
+            background: '#0D2319',
+            sidebar: '#1A3A2E',
+            card: '#245240',
+            cardHover: '#2D6650',
+            accent: '#10B981',
+            accentHover: '#059669',
+            text: '#D1FAE5',
+            textSecondary: '#A7F3D0',
+            textMuted: '#6EE7B7',
+            border: '#2D6650',
             success: '#10B981',
             error: '#EF4444',
             warning: '#F59E0B'
         },
         light: {
-            background: '#ECFDF5',        // Açık Mint
-            sidebar: '#D1FAE5',           // Sidebar
-            card: '#FFFFFF',              // Beyaz Kart
-            cardHover: '#D1FAE5',         // Hover
-            accent: '#059669',            // Zümrüt Vurgu
-            accentHover: '#047857',       // Hover
-            text: '#064E3B',              // Koyu Yeşil Metin
-            textSecondary: '#065F46',     // İkincil
-            textMuted: '#059669',         // Soluk
-            border: '#A7F3D0',            // Çizgi
+            background: '#CCDBCF',        // Sage Green
+            sidebar: '#B8D3C4',
+            card: '#E0EBE4',              // Soft Green-White
+            cardHover: '#D1E0D6',
+            accent: '#064E3B',            // Deep Forest Green (Darker)
+            accentHover: '#022C22',       // Pine Black
+            text: '#020604',              // Near Black
+            textSecondary: '#064E3B',     // Deep Green
+            textMuted: '#3F3F46',         // Dark Zinc
+            border: '#81C784',            // Darker Border
             success: '#059669',
             error: '#DC2626',
             warning: '#D97706'
@@ -125,31 +125,31 @@ const themes = {
     // ========== WARM AMBER ==========
     amber: {
         dark: {
-            background: '#1A1510',        // Koyu Kahve
-            sidebar: '#2D2416',           // Espresso
-            card: '#3D3420',              // Bronz Kart
-            cardHover: '#4D4428',         // Hover
-            accent: '#F59E0B',            // Amber Vurgu
-            accentHover: '#D97706',       // Hover
-            text: '#FEF3C7',              // Açık Sarı Metin
-            textSecondary: '#FDE68A',     // İkincil
-            textMuted: '#FCD34D',         // Soluk
-            border: '#4D4428',            // Çizgi
+            background: '#1A1510',
+            sidebar: '#2D2416',
+            card: '#3D3420',
+            cardHover: '#4D4428',
+            accent: '#F59E0B',
+            accentHover: '#D97706',
+            text: '#FEF3C7',
+            textSecondary: '#FDE68A',
+            textMuted: '#FCD34D',
+            border: '#4D4428',
             success: '#10B981',
             error: '#EF4444',
             warning: '#F59E0B'
         },
         light: {
-            background: '#FFFBEB',        // Açık Krem
-            sidebar: '#FEF3C7',           // Sidebar
-            card: '#FFFFFF',              // Beyaz Kart
-            cardHover: '#FEF3C7',         // Hover
-            accent: '#D97706',            // Amber Vurgu
-            accentHover: '#B45309',       // Hover
-            text: '#451A03',              // Koyu Kahve Metin
-            textSecondary: '#78350F',     // İkincil
-            textMuted: '#92400E',         // Soluk
-            border: '#FDE68A',            // Çizgi
+            background: '#E6DCCF',        // Darker Beige
+            sidebar: '#D9CBB8',
+            card: '#F0EBE0',              // Soft Cream
+            cardHover: '#E6DDCF',
+            accent: '#78350F',            // Deep Amber/Brown (Darker)
+            accentHover: '#451A03',       // Espresso
+            text: '#1C120B',              // Near Black
+            textSecondary: '#78350F',     // Saddle Brown
+            textMuted: '#44403C',         // Dark Stone
+            border: '#BCAAA4',            // Darker Border
             success: '#059669',
             error: '#DC2626',
             warning: '#D97706'

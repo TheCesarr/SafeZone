@@ -90,6 +90,10 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Arkadaşlık Sistemi (İstek Gönder/Kabul Et).
 
 ## Faz 4.6: Discord Eksikleri Analizi (Gap Analysis)
+- [ ] **Server Settings**
+    - [ ] Create tabbed `ServerSettings` modal.
+    - [ ] Move Roles to "Roles" tab.
+    - [ ] Add "Overview" tab (Server Name edit).
 - [ ] **Rol ve Yetki Sistemi:**
     - [ ] Rol Oluşturma (Admin, Mod, Üye).
     - [ ] Rol Renkleri ve Üye Listesinde Gruplama.
@@ -115,6 +119,27 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
     - [x] Ses Odası: `src/components/VoiceRoom.jsx`.
     - [x] Kullanıcı & Ses Kontrolleri: `src/components/UserFooter.jsx`.
 - [x] Codebase Temizliği (Imports & Unused Code).
+
+## Faz 4.8: Backend Refactoring (main.py Modülerleşmesi) - TAMAMLANDI
+- [x] Router Yapısına Geçiş (FastAPI APIRouter).
+- [x] Veritabanı Mantığını Ayırma (`database.py`).
+- [x] Global State Yönetimi (`state.py`).
+- [x] Modüller: `auth`, `server`, `channel`, `friends`, `chat`, `user`.
+- [x] Test ve Doğrulama.
+
+- [x] Test ve Doğrulama.
+
+## Faz 4.9: UI/UX Yenileme & Hata Giderme (Güncel Hedef)
+- [ ] **İşlevsel Düzeltmeler:**
+    - [x] `UserFooter` ses kontrol butonlarını onar (State senkronizasyonu).
+    - [x] Modal kapatma (Outside click) ve ESC desteği.
+    - [ ] Hatalı/Çalışmayan buton tespiti ve onarımı.
+- [ ] **Görsel İyileştirmeler:**
+    - [x] Glassmorphism (Buzlu Cam) efektinin panellere uygulanması.
+    - [ ] Buton animasyonları (Hover/Active scale, Glow).
+    - [ ] `alert()` yerine Toast Bildirim sistemi (`react-hot-toast` veya custom).
+    - [ ] Chat mesajları ve input alanı makyajı.
+    - [ ] Scrollbar özelleştirmesi (İnce ve şeffaf).
 
 ## Faz 5: Altyapı & Büyüme (Gelecek)
 - [x] Düşük gecikme için Türkiye lokasyonlu VDS Kirala (Rabisu/Keyubu - <10ms ping).

@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
+import { getUrl } from '../utils/api';
 
 const LinkPreview = ({ url }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Determine API URL based on environment
-        const API_URL = getUrl('');
+        // Correctly get the full API URL for the endpoint
+        const targetUrl = getUrl('/utils/link-preview');
 
         // Check if token exists in localStorage (rudimentary auth check)
         const token = localStorage.getItem('safezone_token');
 
-        fetch(`${API_URL}/utils/link-preview`, {
+        let isMounted = true;
+
+        fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, token })
         }).then(res => res.json()).then(d => {
-            if (d.status === 'success') setData(d);
-            setLoading(false);
-        }).catch(() => setLoading(false));
+            if (isMounted) {
+                if (d.status === 'success') setData(d);
+                setLoading(false);
+            }
+        }).catch(() => {
+            if (isMounted) setLoading(false);
+        });
+
+        return () => { isMounted = false; };
     }, [url]);
 
     if (loading || !data) return null;
