@@ -140,25 +140,6 @@ const ChannelList = ({
                             ))
                         )}
                     </div>
-
-                    <UserFooter
-                        authState={authState}
-                        activeVoiceChannel={activeVoiceChannel}
-                        selectedServer={selectedServer}
-                        isMuted={isMuted}
-                        isDeafened={isDeafened}
-                        isNoiseCancelled={isNoiseCancelled}
-                        isScreenSharing={isScreenSharing}
-                        ping={ping}
-                        onDisconnect={onDisconnect}
-                        onToggleMute={onToggleMute}
-                        onToggleDeafen={onToggleDeafen}
-                        onToggleNoiseCancellation={onToggleNoiseCancellation}
-                        onScreenShare={onScreenShare}
-                        stopScreenShare={stopScreenShare}
-                        onStatusChange={onStatusChange}
-                        colors={colors}
-                    />
                 </>
             ) : selectedServer ? (
                 <>
@@ -249,49 +230,31 @@ const ChannelList = ({
                             </div>
                         ))}
                     </div>
-
-                    <UserFooter
-                        authState={authState}
-                        activeVoiceChannel={activeVoiceChannel}
-                        selectedServer={selectedServer}
-                        isMuted={isMuted}
-                        isDeafened={isDeafened}
-                        isNoiseCancelled={isNoiseCancelled}
-                        isScreenSharing={isScreenSharing}
-                        ping={ping}
-                        onDisconnect={onDisconnect}
-                        onToggleMute={onToggleMute}
-                        onToggleDeafen={onToggleDeafen}
-                        onToggleNoiseCancellation={onToggleNoiseCancellation}
-                        onScreenShare={onScreenShare}
-                        stopScreenShare={stopScreenShare}
-                        onStatusChange={onStatusChange}
-                        colors={colors}
-                    />
                 </>
             ) : (
-                <div style={{ padding: '20px', color: colors?.textMuted || '#666', textAlign: 'center', marginTop: '50px' }}>
+                <div style={{ flexGrow: 1, padding: '20px', color: colors?.textMuted || '#666', textAlign: 'center', marginTop: '50px' }}>
                     <p>Bir sunucu seçin veya oluşturun.</p>
-                    <UserFooter
-                        authState={authState}
-                        activeVoiceChannel={activeVoiceChannel}
-                        selectedServer={selectedServer}
-                        isMuted={isMuted}
-                        isDeafened={isDeafened}
-                        isNoiseCancelled={isNoiseCancelled}
-                        isScreenSharing={isScreenSharing}
-                        ping={ping}
-                        onDisconnect={onDisconnect}
-                        onToggleMute={onToggleMute}
-                        onToggleDeafen={onToggleDeafen}
-                        onToggleNoiseCancellation={onToggleNoiseCancellation}
-                        onScreenShare={onScreenShare}
-                        stopScreenShare={stopScreenShare}
-                        onStatusChange={onStatusChange}
-                        colors={colors}
-                    />
                 </div>
             )}
+
+            <UserFooter
+                authState={authState}
+                activeVoiceChannel={activeVoiceChannel}
+                selectedServer={selectedServer}
+                isMuted={isMuted}
+                isDeafened={isDeafened}
+                isNoiseCancelled={isNoiseCancelled}
+                isScreenSharing={isScreenSharing}
+                ping={ping}
+                onDisconnect={onDisconnect}
+                onToggleMute={onToggleMute}
+                onToggleDeafen={onToggleDeafen}
+                onToggleNoiseCancellation={onToggleNoiseCancellation}
+                onScreenShare={onScreenShare}
+                stopScreenShare={stopScreenShare}
+                onStatusChange={onStatusChange}
+                colors={colors}
+            />
 
             {children}
         </div>

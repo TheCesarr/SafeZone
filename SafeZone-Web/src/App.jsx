@@ -342,7 +342,7 @@ function App() {
         onStatusChange={lobby.handleStatusChange}
         onScreenShare={webrtc.startScreenShare}
         stopScreenShare={webrtc.stopScreenShare}
-        isScreenSharing={webrtc.voiceStates[uuid.current]?.isScreenSharing}
+        isScreenSharing={webrtc.isScreenSharing}
         handleServerSettings={() => setShowServerSettings(true)}
       >
         {/* Resize Handle */}

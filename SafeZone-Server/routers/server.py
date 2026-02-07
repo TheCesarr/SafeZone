@@ -263,10 +263,34 @@ async def leave_server(data: dict):
         # Check if owner
         c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
         srv = c.fetchone()
+        
         if srv and srv['owner_id'] == user['id']:
-             conn.close()
-             return {"status":"error", "message":"Sunucu sahibi sunucudan ayrılamaz. Sunucuyu silmelisin."}
+             # Owner is leaving. Check if there are other members.
+             c.execute("SELECT user_id FROM members WHERE server_id = ? AND user_id != ? ORDER BY joined_at ASC LIMIT 1", (server_id, user['id']))
+             next_owner = c.fetchone()
              
+             if next_owner:
+                 # Transfer ownership
+                 new_owner_id = next_owner['user_id']
+                 c.execute("UPDATE servers SET owner_id = ? WHERE id = ?", (new_owner_id, server_id))
+                 c.execute("UPDATE members SET role = 'owner' WHERE server_id = ? AND user_id = ?", (server_id, new_owner_id))
+                 
+                 # Log event
+                 log_event("SERVER", f"Ownership transferred from {user['id']} to {new_owner_id} for server {server_id}")
+             else:
+                 # No other members, DELETE server
+                 c.execute("DELETE FROM channel_messages WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?)", (server_id,))
+                 c.execute("DELETE FROM channels WHERE server_id = ?", (server_id,))
+                 c.execute("DELETE FROM user_roles WHERE server_id = ?", (server_id,))
+                 c.execute("DELETE FROM roles WHERE server_id = ?", (server_id,))
+                 c.execute("DELETE FROM members WHERE server_id = ?", (server_id,))
+                 c.execute("DELETE FROM servers WHERE id = ?", (server_id,))
+                 
+                 conn.commit()
+                 conn.close()
+                 return {"status":"success", "message": "Server deleted (no other members)."}
+
+        # Delete the user from members (applies to both regular members and old owner who transferred)
         c.execute("DELETE FROM members WHERE server_id = ? AND user_id = ?", (server_id, user['id']))
         conn.commit()
         conn.close()
