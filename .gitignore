@@ -24,6 +24,10 @@ __pycache__/
 venv/
 env/
 .env
+*.db
+*.log
+safezone.db
+server_log.txt
 *.spec
 
 # Swift / Xcode

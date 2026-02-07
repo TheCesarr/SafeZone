@@ -199,19 +199,28 @@ const UserFooter = ({
 
                     {/* Screen Share (Only when active) */}
                     <button
-                        onClick={isScreenSharing ? stopScreenShare : onScreenShare}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (isScreenSharing) {
+                                stopScreenShare();
+                            } else {
+                                onScreenShare();
+                            }
+                        }}
                         disabled={!activeVoiceChannel}
                         className="interactive-button"
                         title={isScreenSharing ? "Paylaşımı Durdur" : "Ekran Paylaş"}
                         style={{
                             background: 'transparent',
                             border: 'none',
-                            color: isScreenSharing ? '#3BA55C' : (activeVoiceChannel ? mutedColor : (colors?.textMuted || '#4f545c')),
+                            color: isScreenSharing ? '#ed4245' : (activeVoiceChannel ? mutedColor : (colors?.textMuted || '#4f545c')),
                             padding: '8px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: activeVoiceChannel ? 'pointer' : 'not-allowed'
+                            cursor: activeVoiceChannel ? 'pointer' : 'not-allowed',
+                            position: 'relative'
                         }}
                     >
+                        {isScreenSharing && <div style={{ position: 'absolute', width: '100%', height: '2px', background: '#ed4245', transform: 'rotate(45deg)', opacity: 0.8 }}></div>}
                         <IconScreen />
                     </button>
                 </div>

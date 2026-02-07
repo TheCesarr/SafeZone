@@ -218,13 +218,15 @@ const VoiceRoom = ({
                     <div
                         onMouseDown={startResize}
                         className="resize-handle"
+                        title="Boyutlandırmak için sürükle"
                         style={{
                             position: 'absolute',
                             bottom: 0, right: 0,
-                            width: '20px', height: '20px',
+                            width: '30px', height: '30px',
                             cursor: 'nwse-resize',
-                            background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%)',
-                            zIndex: 10
+                            background: 'linear-gradient(135deg, transparent 50%, #3BA55C 50%)',
+                            zIndex: 2000,
+                            borderBottomRightRadius: '8px'
                         }}
                     />
                 </div>

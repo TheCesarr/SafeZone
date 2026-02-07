@@ -1,8 +1,0 @@
---- SERVER STARTED AT 2026-02-07 16:48:08.475108 ---
-16:48:22 | [*] LOBBY    | Lobby connection: c5106bb4-1cb6-4ec5-815b-113eaca3e87a. Total: 1
-16:48:26 | [*] ROOM     | Dynamic room created: Genel Sohbet (564b82d8-2056-48d6-bf1b-c4334eee6fa6)
-16:48:26 | [+] BAGLANDI | c5106bb4-1cb6-4ec5-815b-113eaca3e87a --> Genel Sohbet
-16:48:26 | [*] ROOM     | Dynamic room created: Ses Odası (9fabde58-9ffb-4e93-8581-6b5b0319befc)
-16:48:26 | [+] BAGLANDI | c5106bb4-1cb6-4ec5-815b-113eaca3e87a --> Ses Odası
-16:48:45 | [-] AYRILDI  | c5106bb4-1cb6-4ec5-815b-113eaca3e87a <-- Genel Sohbet
-16:48:45 | [-] AYRILDI  | c5106bb4-1cb6-4ec5-815b-113eaca3e87a <-- Ses Odası

@@ -14,6 +14,7 @@ import SettingsPanel from './components/SettingsPanel';
 import { ServerContextMenu, UserContextMenu } from './components/ContextMenus';
 import Modal from './components/Modal';
 import { getTheme, getPaletteName } from './utils/themes';
+import StreamOverlay from './components/StreamOverlay';
 
 // NEW HOOKS
 import { useAuth } from './hooks/useAuth';
@@ -503,6 +504,15 @@ function App() {
         onBlock={serverData.blockUser}
         onCopyId={(id) => { navigator.clipboard.writeText(id); setUserContextMenu(null); }}
       />
+
+      {/* Persistent Screen Share Overlay */}
+      {webrtc.isScreenSharing && webrtc.screenStreamRef.current && (serverData.selectedChannel?.type !== 'voice') && (
+        <StreamOverlay
+          stream={webrtc.screenStreamRef.current}
+          label="Ekranın Paylaşılıyor"
+          onStop={webrtc.stopScreenShare}
+        />
+      )}
 
     </div>
   )
