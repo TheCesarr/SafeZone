@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getUrl } from '../utils/api';
-import UserFooter from './UserFooter'; // If needed inside or just layout
+
 
 // Helper for status colors
 const getStatusColor = (status) => {

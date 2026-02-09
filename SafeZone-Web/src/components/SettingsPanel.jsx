@@ -354,7 +354,7 @@ const SettingsPanel = ({
             </div>
 
             <div style={{ position: 'absolute', top: '20px', right: '40px', fontSize: '12px', color: 'rgba(255,255,255,0.2)' }}>
-                SafeZone v1.4.0 (Refactored)
+                SafeZone v1.4.7 (Refactored)
             </div>
         </div>
     );

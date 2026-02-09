@@ -8,8 +8,6 @@ const VoiceRoom = ({
     screenStreamRef,
     connectedUsers,
     voiceStates,
-    handleUserVolumeChange,
-    userVolumes = {},
     activeVoiceChannel
 }) => {
     const [watchingStreamId, setWatchingStreamId] = useState(null);

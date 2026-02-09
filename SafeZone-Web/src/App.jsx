@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid';
 import ServerSidebar from './components/ServerSidebar';
-import { getUrl, STUN_SERVERS } from './utils/api';
-import LinkPreview from './components/LinkPreview';
-import SoundManager from './utils/SoundManager';
+import { getUrl } from './utils/api';
 import UserFooter from './components/UserFooter';
 import ChatArea from './components/ChatArea';
 import ChannelList from './components/ChannelList';
@@ -15,6 +13,7 @@ import { ServerContextMenu, UserContextMenu } from './components/ContextMenus';
 import Modal from './components/Modal';
 import { getTheme, getPaletteName } from './utils/themes';
 import StreamOverlay from './components/StreamOverlay';
+import MemberList from './components/MemberList';
 
 // NEW HOOKS
 import { useAuth } from './hooks/useAuth';
@@ -29,7 +28,7 @@ function App() {
   const [isServerSet, setIsServerSet] = useState(!!localStorage.getItem('safezone_server_ip'))
 
   // Auth Hook
-  const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleLogout: hookLogout, isLoading: authLoading } = useAuth();
+  const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, isLoading: authLoading } = useAuth();
   const [authInput, setAuthInput] = useState({ username: '', password: '', display_name: '', recovery_pin: '' });
 
   // Refs (used by multiple hooks)
@@ -90,11 +89,7 @@ function App() {
   const [editDisplayName, setEditDisplayName] = useState('')
   const [editAvatarColor, setEditAvatarColor] = useState('#5865F2')
 
-  // Devices (Moved up)
-  // const [inputDevices, setInputDevices] = useState([])
-  // const [outputDevices, setOutputDevices] = useState([])
-  // const [selectedInputId, setSelectedInputId] = useState('default')
-  // const [selectedOutputId, setSelectedOutputId] = useState('default')
+
 
   // Friends UI
   const [showFriendsList, setShowFriendsList] = useState(false)
@@ -177,6 +172,7 @@ function App() {
   const handleAuthSubmit = () => {
     if (authMode === 'login') handleLogin(authInput.username, authInput.password);
     else if (authMode === 'register') handleRegister(authInput.username, authInput.password, authInput.display_name, authInput.recovery_pin);
+    else if (authMode === 'reset') handleResetPassword(authInput.username, authInput.recovery_pin, authInput.password);
     // Reset logic handled in hook? No, added simplified.
   }
 
@@ -252,14 +248,36 @@ function App() {
         <div style={{ width: '480px', padding: '32px', background: colors.card, borderRadius: '5px' }}>
           <h2 style={{ color: colors.text, marginBottom: '20px' }}>{authMode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</h2>
           {authError && <div style={{ color: colors.error, marginBottom: 10 }}>{authError}</div>}
-          <div style={{ marginBottom: 15 }}>
-            <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KULLANICI ADI</label>
-            <input type="text" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>ŞİFRE</label>
-            <input type="password" value={authInput.password} onChange={e => setAuthInput({ ...authInput, password: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
-          </div>
+          {authMode === 'reset' && (
+            <>
+              <div style={{ marginBottom: 15 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KULLANICI ADI</label>
+                <input type="text" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+              <div style={{ marginBottom: 15 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KURTARMA PIN (4 Haneli)</label>
+                <input type="text" maxLength="4" value={authInput.recovery_pin} onChange={e => setAuthInput({ ...authInput, recovery_pin: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>YENİ ŞİFRE</label>
+                <input type="password" value={authInput.password} onChange={e => setAuthInput({ ...authInput, password: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+            </>
+          )}
+
+          {authMode !== 'reset' && (
+            <>
+              <div style={{ marginBottom: 15 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KULLANICI ADI</label>
+                <input type="text" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>ŞİFRE</label>
+                <input type="password" value={authInput.password} onChange={e => setAuthInput({ ...authInput, password: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+            </>
+          )}
+
           {authMode === 'register' && (
             <>
               <div style={{ marginBottom: 15 }}>
@@ -272,11 +290,21 @@ function App() {
               </div>
             </>
           )}
-          <button onClick={handleAuthSubmit} style={{ width: '100%', padding: 10, background: colors.accent, color: '#fff', border: 'none', borderRadius: 3, fontWeight: 'bold', cursor: 'pointer' }}>{authMode === 'login' ? 'Giriş' : 'Kayıt Ol'}</button>
+
+          <button onClick={handleAuthSubmit} style={{ width: '100%', padding: 10, background: colors.accent, color: '#fff', border: 'none', borderRadius: 3, fontWeight: 'bold', cursor: 'pointer' }}>
+            {authMode === 'login' ? 'Giriş' : authMode === 'register' ? 'Kayıt Ol' : 'Şifreyi Sıfırla'}
+          </button>
           <div style={{ marginTop: 10, fontSize: 14, color: '#72767d' }}>
             {authMode === 'login' ?
-              <>Hesabın yok mu? <span onClick={() => setAuthMode('register')} style={{ color: colors.accent, cursor: 'pointer' }}>Kaydol</span></> :
-              <>Zaten hesabın var mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer' }}>Giriş Yap</span></>
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+                  <span style={{ fontSize: 14, color: '#72767d' }}>Hesabın yok mu? <span onClick={() => setAuthMode('register')} style={{ color: colors.accent, cursor: 'pointer' }}>Kaydol</span></span>
+                  <span onClick={() => setAuthMode('reset')} style={{ fontSize: 14, color: colors.accent, cursor: 'pointer' }}>Şifremi Unuttum</span>
+                </div>
+              </> :
+              authMode === 'register' ?
+                <>Zaten hesabın var mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer' }}>Giriş Yap</span></> :
+                <>Hatırladın mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer' }}>Giriş Yap</span></>
             }
           </div>
         </div>
@@ -335,10 +363,12 @@ function App() {
         authState={authState}
         isMuted={webrtc.isMuted}
         isDeafened={webrtc.isDeafened}
+        isNoiseCancelled={audioSettings.noiseSuppression}
         ping={lobby.ping}
         onDisconnect={webrtc.disconnectVoice}
         onToggleMute={webrtc.toggleMute}
         onToggleDeafen={webrtc.toggleDeafen}
+        onToggleNoiseCancellation={() => setAudioSettings(prev => ({ ...prev, noiseSuppression: !prev.noiseSuppression }))}
         onStatusChange={lobby.handleStatusChange}
         onScreenShare={webrtc.startScreenShare}
         stopScreenShare={webrtc.stopScreenShare}
@@ -360,58 +390,70 @@ function App() {
         </div>
 
         {/* Content */}
-        {(serverData.selectedChannel?.type === 'text' || lobby.selectedDM) ? (
-          <ChatArea
-            colors={colors}
-            selectedChannel={serverData.selectedChannel}
-            selectedDM={lobby.selectedDM}
-            messages={lobby.selectedDM ? lobby.dmHistory : chat.messages}
-            dmHistory={lobby.dmHistory}
-            currentUser={authState.user}
-            inputText={chat.inputText}
-            setInputText={chat.setInputText}
-            onSendMessage={chat.sendChatMessage}
-            onSendDM={() => lobby.sendDM(chat.inputText)} // Note: chat.inputText is reused, but sendDM clears it? No useLobby doesn't control inputText. 
-            // Fix: useLobby sendDM should assume input comes from UI. we need to clear chat.inputText.
-            // Better: onSendDM={() => { lobby.sendDM(chat.inputText); chat.setInputText(""); }}
-            handleTyping={chat.handleTyping}
-            typingUsers={chat.typingUsers}
-            attachment={chat.attachment}
-            setAttachment={chat.setAttachment}
-            isUploading={chat.isUploading}
-            handleFileSelect={chat.handleFileSelect}
-            // Context Menu & Edit
-            handleMessageContextMenu={chat.handleMessageContextMenu}
-            editingMessageId={chat.editingMessageId}
-            setEditingMessageId={chat.setEditingMessageId}
-            editText={chat.editText}
-            setEditText={chat.setEditText}
-            submitEdit={chat.submitEdit}
-          />
-        ) : (serverData.selectedChannel?.type === 'voice') ? (
-          <VoiceRoom
-            colors={colors}
-            connectedUsers={webrtc.connectedUsers}
-            speakingUsers={webrtc.speakingUsers}
-            voiceStates={webrtc.voiceStates}
-            channelName={serverData.selectedChannel.name}
-            remoteStreams={webrtc.remoteStreams}
-            activeUsersRef={{ current: webrtc.connectedUsers }} // Shim for VoiceRoom compatibility
-            isScreenSharing={webrtc.isScreenSharing}
-            screenStreamRef={webrtc.screenStreamRef}
-          />
-        ) : (
-          <FriendsDashboard
-            colors={colors}
-            friends={serverData.friends}
-            requests={serverData.friendRequests}
-            onlineUserIds={lobby.onlineUserIds}
-            onAddFriend={() => setShowAddFriend(true)}
-          />
-        )}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}> {/* New Flex Container for Chat + MemberList */}
+          {(serverData.selectedChannel?.type === 'text' || lobby.selectedDM) ? (
+            <>
+              <ChatArea
+                colors={colors}
+                selectedChannel={serverData.selectedChannel}
+                selectedDM={lobby.selectedDM}
+                messages={lobby.selectedDM ? lobby.dmHistory : chat.messages}
+                dmHistory={lobby.dmHistory}
+                currentUser={authState.user}
+                inputText={chat.inputText}
+                setInputText={chat.setInputText}
+                onSendMessage={chat.sendChatMessage}
+                onSendDM={() => lobby.sendDM(chat.inputText)}
+                handleTyping={chat.handleTyping}
+                typingUsers={chat.typingUsers}
+                attachment={chat.attachment}
+                setAttachment={chat.setAttachment}
+                isUploading={chat.isUploading}
+                handleFileSelect={chat.handleFileSelect}
+                handleMessageContextMenu={chat.handleMessageContextMenu}
+                editingMessageId={chat.editingMessageId}
+                setEditingMessageId={chat.setEditingMessageId}
+                editText={chat.editText}
+                setEditText={chat.setEditText}
+                submitEdit={chat.submitEdit}
+              />
+
+              {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}
+              {serverData.selectedChannel?.type === 'text' && !lobby.selectedDM && (
+                <MemberList
+                  members={serverData.serverMembers}
+                  onlineUserIds={lobby.onlineUserIds}
+                  userStatuses={lobby.userStatuses}
+                  colors={colors}
+                  width={memberListWidth}
+                  onResizeStart={handleResizeStart}
+                />
+              )}
+            </>
+          ) : (serverData.selectedChannel?.type === 'voice') ? (
+            <VoiceRoom
+              colors={colors}
+              connectedUsers={webrtc.connectedUsers}
+              speakingUsers={webrtc.speakingUsers}
+              voiceStates={webrtc.voiceStates}
+              channelName={serverData.selectedChannel.name}
+              remoteStreams={webrtc.remoteStreams}
+              activeUsersRef={{ current: webrtc.connectedUsers }}
+              isScreenSharing={webrtc.isScreenSharing}
+              screenStreamRef={webrtc.screenStreamRef}
+            />
+          ) : (
+            <FriendsDashboard
+              colors={colors}
+              friends={serverData.friends}
+              requests={serverData.friendRequests}
+              onlineUserIds={lobby.onlineUserIds}
+              onAddFriend={() => setShowAddFriend(true)}
+            />
+          )}
+        </div>
       </div>
 
-      {/* MODALS */}
       {/* MODALS */}
       {showCreateServer && (
         <Modal title="Sunucu Oluştur" onClose={() => { setShowCreateServer(false); setModalInput(""); }} colors={colors}>

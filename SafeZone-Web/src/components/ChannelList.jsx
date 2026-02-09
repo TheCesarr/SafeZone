@@ -1,6 +1,6 @@
 import React from 'react';
 import UserFooter from './UserFooter';
-import { getUrl } from '../utils/api';
+
 
 const ChannelList = ({
     colors,

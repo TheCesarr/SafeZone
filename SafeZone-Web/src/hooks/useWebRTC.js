@@ -250,7 +250,6 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     // --- DEVICE CHANGE EFFECTS ---
 
     // Switch Input Device (Hot-Swap)
-    // Switch Input Device (Hot-Swap)
     useEffect(() => {
         if (activeVoiceChannel && localStream.current) {
             console.log("Switching Input Device to:", selectedInputId);

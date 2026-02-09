@@ -100,6 +100,32 @@ export const useAuth = () => {
         }
     }
 
+    const handleResetPassword = async (username, pin, newPassword) => {
+        setAuthError(null);
+        try {
+            const res = await fetch(getUrl('/auth/reset'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    recovery_pin: pin,
+                    new_password: newPassword
+                })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                setAuthError(null);
+                alert(data.message); // Success feedback
+                setAuthMode('login'); // Switch back to login
+            } else {
+                setAuthError(data.message);
+            }
+        } catch (err) {
+            setAuthError('Sıfırlama hatası!');
+            console.error(err);
+        }
+    }
+
     const handleLogout = () => {
         localStorage.removeItem('safezone_token');
         setAuthState({ token: null, user: null });
@@ -113,6 +139,7 @@ export const useAuth = () => {
         isLoading,
         handleLogin,
         handleRegister,
+        handleResetPassword,
         handleLogout
     };
 }
