@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { getTheme, getPalettes, getPaletteName } from '../utils/themes';
 import { getUrl } from '../utils/api';
+import toast from '../utils/toast';
 
 const SettingsPanel = ({
     show,
@@ -88,7 +89,7 @@ const SettingsPanel = ({
 
         } catch (e) {
             console.error("Mic Test Error:", e);
-            alert("Mikrofon testi başlatılamadı: " + e.message);
+            toast.error("Mikrofon testi başlatılamadı: " + e.message);
         }
     };
 
@@ -133,14 +134,14 @@ const SettingsPanel = ({
             });
             const data = await res.json();
             if (data.status === 'success') {
-                alert("Avatar yüklendi! Lütfen sayfayı yenileyin.");
+                toast.success("Avatar yüklendi! Lütfen sayfayı yenileyin.");
                 // Simply for preview if we had an avatar_url state
             } else {
-                alert("Hata: " + data.message);
+                toast.error("Hata: " + data.message);
             }
         } catch (err) {
             console.error(err);
-            alert("Yükleme hatası");
+            toast.error("Yükleme hatası");
         }
     }
 
@@ -158,9 +159,9 @@ const SettingsPanel = ({
                     avatar_color: editAvatarColor
                 })
             });
-            alert("Profil güncellendi! (Yenileme gerekebilir)");
+            toast.success("Profil güncellendi! (Yenileme gerekebilir)");
             // In a real app, successful response would update authState context
-        } catch (e) { console.error(e); alert("Hata"); }
+        } catch (e) { console.error(e); toast.error("Hata"); }
     }
 
     return (
@@ -354,7 +355,7 @@ const SettingsPanel = ({
             </div>
 
             <div style={{ position: 'absolute', top: '20px', right: '40px', fontSize: '12px', color: 'rgba(255,255,255,0.2)' }}>
-                SafeZone v1.4.7 (Refactored)
+                SafeZone v1.4.9 (Refactored)
             </div>
         </div>
     );

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { getUrl } from '../utils/api';
+import toast from '../utils/toast';
 
 export const useServerData = (authState) => {
     // Data State
@@ -85,7 +86,7 @@ export const useServerData = (authState) => {
                 await fetchServers();
                 return true;
             } else {
-                alert(data.message);
+                toast.error(data.message);
                 return false;
             }
         } catch (e) {
@@ -106,7 +107,7 @@ export const useServerData = (authState) => {
                 await fetchServers();
                 return true;
             } else {
-                alert(data.message);
+                toast.error(data.message);
                 return false;
             }
         } catch (e) {
@@ -137,7 +138,7 @@ export const useServerData = (authState) => {
                 await fetchServers();
                 return true;
             } else {
-                alert(data.message);
+                toast.error(data.message);
                 return false;
             }
         } catch (e) { console.error(e); }
@@ -160,7 +161,7 @@ export const useServerData = (authState) => {
                 fetchServers(); // Refresh list to show new channel
                 return true;
             } else {
-                alert(data.message);
+                toast.error(data.message);
                 return false;
             }
         } catch (e) {
@@ -179,7 +180,7 @@ export const useServerData = (authState) => {
             });
             const data = await res.json();
             if (data.status === 'success') { fetchFriends(); return true; }
-            else { alert(data.message); return false; }
+            else { toast.error(data.message); return false; }
         } catch (e) { console.error(e); return false; }
     }
 
@@ -209,7 +210,7 @@ export const useServerData = (authState) => {
     const blockUser = async (user) => {
         if (!window.confirm(`${user.username} engellensin mi?`)) return;
         // Mock Implementation or Real Endpoint if exists
-        alert("Engelleme özelliği yakında!");
+        toast.warning("Engelleme özelliği yakında!");
     }
 
     return {

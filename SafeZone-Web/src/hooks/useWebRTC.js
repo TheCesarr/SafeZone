@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { getUrl, STUN_SERVERS } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
+import toast from '../utils/toast';
 
 export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedInputId, selectedOutputId, audioSettings) => {
     // Media & Connection Refs
@@ -141,7 +142,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
             setupVoiceActivityDetection(stream);
         } catch (e) {
-            alert("Mikrofon izni gerekli.");
+            toast.error("Mikrofon izni gerekli.");
             console.error(e);
         }
     }

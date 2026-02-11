@@ -20,7 +20,7 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] iOS Projesini Başlat (SwiftUI).
 - [x] Temel Kimlik Doğrulama Sistemi (Arayüz Taslağı).
 - [x] Ses Kontrollü "Lobi" arayüzünü oluştur.
-- [ ] Gerçek Backend'e Bağla.
+- [x] Gerçek Backend'e Bağla.
 
 ## Faz 3.5: MVP Backend (Python/FastAPI)
 - [x] Python Projesini Başlat (`SafeZone-Server`).
@@ -49,7 +49,7 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [ ] Discord Nitro yerine "Premium" model tasarla (Yerel fiyatlandırma).
 - [ ] "Ebeveyn Paneli" konseptini taslağa dök (Düzenleyiciler için satış noktası).
 - [x] Kullanıcı Kimlik Doğrulama (SQLite ile Giriş/Kayıt) & Otomatik Giriş.
-- [ ] Gelişmiş Ses Kontrolleri:
+- [x] Gelişmiş Ses Kontrolleri:
     - [x] Kendini Sustur/Aç (Mikrofon anahtarı).
     - [x] Sağırlaştır/Duy (Gelen tüm sesleri kapat).
     - [x] Uzak Kullanıcı Ses Kontrolü / Susturma (Kişiye özel ses ayarı).
@@ -58,7 +58,7 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Son Arayüz/UX Cilası:
     - [x] Modern cam (glassmorphism) tasarım iyileştirmeleri.
 
-## Faz 4.2: Sohbet Kalıcılığı (Persistence) - YENİ
+## Faz 4.2: Sohbet Kalıcılığı (Persistence) - TAMAMLANDI
 - [x] Özel Mesaj Geçmişini Kaydetme (SQLite).
 - [x] Sunucu Odası Sohbet Geçmişini Kaydetme (DB + HTTP Fetch).
 - [x] Bağlantı Kesilip Geri Gelince Geçmişi Yükleme.
@@ -67,7 +67,7 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Kanal Yönetimi (Oluştur/Sil/Yeniden Adlandır).
 - [x] Ses Aktivitesi Göstergesi (Konuşan Kişiye Yeşil Çerçeve).
 
-## Faz 4.5: Discord-Benzeri Sunucu Yapısı (Kullanıcı İsteği)
+## Faz 4.5: Discord-Benzeri Sunucu Yapısı - TAMAMLANDI
 - [x] Veritabanı Şeması Güncellemesi (Sunucular & Kanallar)
     - [x] `servers` tablosu (create, join logic).
     - [x] `channels` tablosu (ses kanalları).
@@ -89,27 +89,31 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Özel Mesajlaşma (Birebir Sohbet).
 - [x] Arkadaşlık Sistemi (İstek Gönder/Kabul Et).
 
-## Faz 4.6: Discord Eksikleri Analizi (Gap Analysis)
-- [ ] **Server Settings**
-    - [ ] Create tabbed `ServerSettings` modal.
-    - [ ] Move Roles to "Roles" tab.
-    - [ ] Add "Overview" tab (Server Name edit).
-- [ ] **Rol ve Yetki Sistemi:**
-    - [ ] Rol Oluşturma (Admin, Mod, Üye).
-    - [ ] Rol Renkleri ve Üye Listesinde Gruplama.
+## Faz 4.6: Discord Eksikleri Analizi (Gap Analysis) - BÜYÜK ORANDA TAMAMLANDI
+- [x] **Server Settings**
+    - [x] Create tabbed `ServerSettings` modal.
+    - [x] Move Roles to "Roles" tab.
+    - [x] Add "Overview" tab (Server Name edit).
+- [x] **Rol Sistemi (Temel):**
+    - [x] Rol Oluşturma (Ad + Renk + İzin).
+    - [x] Rol Renkleri.
+    - [x] Rol Düzenleme ve Silme.
+    - [ ] Üye Listesinde Rol Bazlı Gruplama.
     - [ ] Kanallara Rol Bazlı Erişim (Kilitli Odalar).
-- [ ] **Zengin Sohbet Deneyimi:**
+- [x] **Zengin Sohbet Deneyimi:**
     - [x] Dosya Gönderimi (Resim/Dosya Paylaşımı).
     - [x] Mesaj Düzenleme ve Silme.
     - [x] Link Önizlemeleri (Embeds).
     - [x] "Yazıyor..." Göstergesi.
-    - [ ] Markdown Desteği (Kullanıcı İsteğiyle Ertelendi).
-    - [ ] Emojiler ve Reaksiyonlar (Kullanıcı İsteğiyle Ertelendi).
-- [ ] **Gelişmiş UX ve Bildirimler:**
+    - [x] Markdown Desteği (`react-markdown` entegrasyonu).
+    - [ ] Emojiler ve Reaksiyonlar.
+- [x] **Bildirimler:**
     - [x] Bildirim Sesleri (Katılma/Ayrılma, Mesaj, Etkileşim).
+    - [x] `alert()` yerine Toast Bildirim sistemi (Custom `toast.js` + `useToast` hook).
+- [ ] **Gelişmiş UX:**
     - [ ] Klavye Kısayolları (Push-to-Talk).
-    - [ ] Kullanıcı Durumları (Boşta, Rahatsız Etmeyin).
-    - [ ] Profil Kartları (Kullanıcıya tıklayınca detay).
+    - [ ] Kullanıcı Durumları (Boşta, Rahatsız Etmeyin) — *UI altyapısı var (MemberList'te idle/dnd/invisible renkleri), backend senkronizasyonu eksik.*
+    - [ ] Profil Kartları (Kullanıcıya tıklayınca detaylı pop-up) — *Sağ-tık context menüsü var (Arkadaş Ekle/Engelle/ID Kopyala), detaylı kart eksik.*
 
 ## Faz 4.7: Frontend Refactoring (App.jsx Modülerleşmesi) - TAMAMLANDI
 - [x] Bileşenleri Ayırma (Extract Components):
@@ -127,23 +131,34 @@ Bu proje, Türkiye'de Discord ve Roblox gibi platformların yasaklanmasının ya
 - [x] Modüller: `auth`, `server`, `channel`, `friends`, `chat`, `user`.
 - [x] Test ve Doğrulama.
 
-- [x] Test ve Doğrulama.
-
-## Faz 4.9: UI/UX Yenileme & Hata Giderme (Güncel Hedef)
-- [ ] **İşlevsel Düzeltmeler:**
+## Faz 4.9: UI/UX Yenileme & Hata Giderme - BÜYÜK ORANDA TAMAMLANDI
+- [x] **İşlevsel Düzeltmeler:**
     - [x] `UserFooter` ses kontrol butonlarını onar (State senkronizasyonu).
     - [x] Modal kapatma (Outside click) ve ESC desteği.
-    - [ ] Hatalı/Çalışmayan buton tespiti ve onarımı.
-- [ ] **Görsel İyileştirmeler:**
+    - [x] Hatalı/Çalışmayan buton tespiti ve onarımı.
+- [x] **Görsel İyileştirmeler:**
     - [x] Glassmorphism (Buzlu Cam) efektinin panellere uygulanması.
-    - [ ] Buton animasyonları (Hover/Active scale, Glow).
-    - [ ] `alert()` yerine Toast Bildirim sistemi (`react-hot-toast` veya custom).
-    - [ ] Chat mesajları ve input alanı makyajı.
-    - [ ] Scrollbar özelleştirmesi (İnce ve şeffaf).
+    - [x] Buton animasyonları (Hover/Active scale, Glow) — `interactive-button`, `glow-button`, `interactive-icon` CSS sınıfları.
+    - [x] `alert()` yerine Toast Bildirim sistemi (Custom `toast.js` + `useToast`).
+    - [x] Chat mesajları ve input alanı makyajı — `chat-input-wrapper`, `message-row` CSS sınıfları.
+    - [x] Scrollbar özelleştirmesi (İnce ve şeffaf) — Webkit + Firefox scrollbar stilleri.
 
-## Faz 5: Altyapı & Büyüme (Gelecek)
+## Faz 5: Altyapı & Büyüme
 - [x] Düşük gecikme için Türkiye lokasyonlu VDS Kirala (Rabisu/Keyubu - <10ms ping).
 - [x] Backend & Web Sunucusunu VDS'e Taşı.
 - [x] Dağıtım İş Akışını Kur (GitHub'a Aktarım Hazırlandı).
 - [x] VDS için Kritik Düzeltmeler (Ses Yarış Durumu & Çift Mesaj).
 - [ ] Alan Adı (Domain) & SSL (Let's Encrypt) Kurulumu (Production için).
+
+---
+
+## Kalan İşler Özeti (Yapılacaklar)
+- [ ] Üye Listesinde Rol Bazlı Gruplama
+- [ ] Kanallara Rol Bazlı Erişim (Kilitli Odalar)
+- [ ] Emojiler ve Reaksiyonlar
+- [ ] Push-to-Talk Kısayolu
+- [ ] Kullanıcı Durumları Backend Senkronizasyonu (Boşta/DND)
+- [ ] Profil Kartları (Detaylı pop-up)
+- [ ] Alan Adı & SSL Kurulumu
+- [ ] Premium Model Tasarımı
+- [ ] Ebeveyn Paneli Konsepti

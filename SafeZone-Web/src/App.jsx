@@ -14,6 +14,8 @@ import Modal from './components/Modal';
 import { getTheme, getPaletteName } from './utils/themes';
 import StreamOverlay from './components/StreamOverlay';
 import MemberList from './components/MemberList';
+import { useToast } from './hooks/useToast';
+import ToastContainer from './components/common/Toast';
 
 // NEW HOOKS
 import { useAuth } from './hooks/useAuth';
@@ -26,6 +28,9 @@ function App() {
   // --- 1. CONFIG & AUTH ---
   const [serverIp, setServerIp] = useState(localStorage.getItem('safezone_server_ip') || window.location.hostname || 'localhost')
   const [isServerSet, setIsServerSet] = useState(!!localStorage.getItem('safezone_server_ip'))
+
+  // Toast Hook
+  const { toasts, showToast, removeToast } = useToast();
 
   // Auth Hook
   const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, isLoading: authLoading } = useAuth();
@@ -307,6 +312,11 @@ function App() {
                 <>Hatırladın mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer' }}>Giriş Yap</span></>
             }
           </div>
+          <div style={{ marginTop: 20, textAlign: 'center', borderTop: '1px solid #2f3136', paddingTop: 10 }}>
+            <span onClick={() => setIsServerSet(false)} style={{ fontSize: 12, color: '#72767d', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+              ⚙️ Sunucu Ayarları
+            </span>
+          </div>
         </div>
       </div>
     )
@@ -499,7 +509,7 @@ function App() {
             <button onClick={() => { setShowAddFriend(false); setFriendInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
             <button onClick={() => {
               serverData.addFriend(friendInput).then(success => {
-                if (success) { alert("Arkadaş eklendi!"); setShowAddFriend(false); setFriendInput(""); }
+                if (success) { showToast("Arkadaş eklendi!", "success"); setShowAddFriend(false); setFriendInput(""); }
               });
             }} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Ekle</button>
           </div>
@@ -555,6 +565,9 @@ function App() {
           onStop={webrtc.stopScreenShare}
         />
       )}
+
+      {/* TOAST NOTIFICATIONS */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
 
     </div>
   )

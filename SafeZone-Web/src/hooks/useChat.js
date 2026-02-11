@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { getUrl } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
+import toast from '../utils/toast';
 
 // v2: Added connectToChannel and message handling
 export const useChat = (authState, uuid, chatWs, roomWs) => {
@@ -87,11 +88,11 @@ export const useChat = (authState, uuid, chatWs, roomWs) => {
             if (data.status === 'success') {
                 setAttachment(data);
             } else {
-                alert("Yükleme başarısız: " + data.message);
+                toast.error("Yükleme başarısız: " + data.message);
             }
         } catch (err) {
             console.error(err);
-            alert("Dosya yükleme hatası!");
+            toast.error("Dosya yükleme hatası!");
         } finally {
             setIsUploading(false);
         }

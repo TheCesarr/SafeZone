@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getUrl } from '../utils/api';
+import toast from '../utils/toast';
 
 const ServerSettings = ({ server, onClose, authState, colors }) => {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roles'
@@ -22,7 +23,7 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
     // --- OVERVIEW ACTIONS ---
     const handleSaveOverview = async () => {
         // Mock implementation for server name update
-        alert("Sunucu adı güncelleme henüz aktif değil, ama buraya gelecek!");
+        toast.info("Sunucu adı güncelleme henüz aktif değil, ama buraya gelecek!");
     }
 
     // --- ROLES ACTIONS ---
@@ -59,8 +60,8 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
             });
             const data = await res.json();
             if (data.status === 'success') fetchRoles(data.role ? data.role.id : null);
-            else alert(data.message);
-        } catch (e) { alert(e.message); }
+            else toast.error(data.message);
+        } catch (e) { toast.error(e.message); }
     };
 
     const handleSaveRole = async () => {
@@ -74,9 +75,9 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
             const data = await res.json();
             if (data.status === 'success') {
                 setRoles(prev => prev.map(r => r.id === selectedRole.id ? { ...r, name: editRoleName, color: editRoleColor } : r));
-                alert("Rol kaydedildi!");
-            } else alert(data.message);
-        } catch (e) { alert(e.message); }
+                toast.success("Rol kaydedildi!");
+            } else toast.error(data.message);
+        } catch (e) { toast.error(e.message); }
     };
 
     const handleDeleteRole = async () => {
@@ -85,7 +86,7 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
             await fetch(getUrl(`/server/${server.id}/roles/${selectedRole.id}?token=${authState.token}`), { method: 'DELETE' });
             setSelectedRole(null);
             fetchRoles();
-        } catch (e) { alert(e.message); }
+        } catch (e) { toast.error(e.message); }
     };
 
     const bgColor = colors.background;

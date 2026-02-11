@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getUrl } from '../utils/api';
+import toast from '../utils/toast';
 
 export const useAuth = () => {
     // State
@@ -115,7 +116,7 @@ export const useAuth = () => {
             const data = await res.json();
             if (data.status === 'success') {
                 setAuthError(null);
-                alert(data.message); // Success feedback
+                toast.success(data.message);
                 setAuthMode('login'); // Switch back to login
             } else {
                 setAuthError(data.message);
