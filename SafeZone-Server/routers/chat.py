@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from database import get_db_connection, DB_NAME
-from utils import log_event
+from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES
 from state import lobby, rooms, VoiceRoom, broadcast_room_update, broadcast_user_list
 import sqlite3
 import json
@@ -23,7 +23,7 @@ async def broadcast(room, message: str):
 # --- HTTP Endpoints ---
 
 @router.get("/channel/{channel_id}/messages")
-async def get_channel_messages(channel_id: str, token: str):
+async def get_channel_messages(channel_id: str, token: str, before: int = None, limit: int = 100):
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -35,19 +35,67 @@ async def get_channel_messages(channel_id: str, token: str):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
             
-        # 2. Get Messages
-        c.execute('''
-            SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type, cm.attachment_name, cm.edited_at, u.username as sender
-            FROM channel_messages cm
-            JOIN users u ON cm.sender_id = u.id
-            WHERE cm.channel_id = ?
-            ORDER BY cm.timestamp ASC
-            LIMIT 1000
-        ''', (channel_id,))
+        # 2. Get Messages (with pagination)
+        if before:
+            c.execute('''
+                SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type, 
+                       cm.attachment_name, cm.edited_at, cm.reply_to_id, cm.is_pinned, u.username as sender
+                FROM channel_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE cm.channel_id = ? AND cm.id < ?
+                ORDER BY cm.timestamp DESC
+                LIMIT ?
+            ''', (channel_id, before, min(limit, 100)))
+        else:
+            c.execute('''
+                SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type, 
+                       cm.attachment_name, cm.edited_at, cm.reply_to_id, cm.is_pinned, u.username as sender
+                FROM channel_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE cm.channel_id = ?
+                ORDER BY cm.timestamp DESC
+                LIMIT ?
+            ''', (channel_id, min(limit, 100)))
+        
+        rows = c.fetchall()
+        msg_ids = [row['id'] for row in rows]
+        
+        # 3. Fetch reactions for these messages
+        reactions_map = {}
+        if msg_ids:
+            placeholders = ','.join(['?'] * len(msg_ids))
+            c.execute(f'''
+                SELECT mr.message_id, mr.emoji, u.username
+                FROM message_reactions mr
+                JOIN users u ON mr.user_id = u.id
+                WHERE mr.message_id IN ({placeholders})
+            ''', msg_ids)
+            for r in c.fetchall():
+                mid = r['message_id']
+                if mid not in reactions_map:
+                    reactions_map[mid] = {}
+                emoji = r['emoji']
+                if emoji not in reactions_map[mid]:
+                    reactions_map[mid][emoji] = []
+                reactions_map[mid][emoji].append(r['username'])
+        
+        # 4. Fetch reply-to info
+        reply_ids = [row['reply_to_id'] for row in rows if row['reply_to_id']]
+        reply_map = {}
+        if reply_ids:
+            placeholders = ','.join(['?'] * len(reply_ids))
+            c.execute(f'''
+                SELECT cm.id, cm.content, u.username as sender
+                FROM channel_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE cm.id IN ({placeholders})
+            ''', reply_ids)
+            for r in c.fetchall():
+                reply_map[r['id']] = {"id": r['id'], "sender": r['sender'], "text": r['content'][:100]}
         
         messages = []
-        for row in c.fetchall():
-            messages.append({
+        for row in rows:
+            msg = {
                 "id": row['id'],
                 "sender": row['sender'],
                 "text": row['content'],
@@ -55,8 +103,14 @@ async def get_channel_messages(channel_id: str, token: str):
                 "attachment_url": row['attachment_url'],
                 "attachment_type": row['attachment_type'],
                 "attachment_name": row['attachment_name'],
-                "edited_at": row['edited_at']
-            })
+                "edited_at": row['edited_at'],
+                "is_pinned": bool(row['is_pinned']),
+                "reactions": reactions_map.get(row['id'], {}),
+                "reply_to": reply_map.get(row['reply_to_id'])
+            }
+            messages.append(msg)
+        
+        messages.reverse()  # Back to chronological order
             
         conn.close()
         return {"status": "success", "messages": messages}
@@ -147,12 +201,23 @@ async def delete_message(data: dict):
         user = c.fetchone()
         if not user: return {"status": "error"}
             
-        # Verify ownership or admin (TODO: Admin check)
-        c.execute("SELECT sender_id FROM channel_messages WHERE id = ?", (message_id,))
+        # Get the message details
+        c.execute("SELECT sender_id, channel_id FROM channel_messages WHERE id = ?", (message_id,))
         msg = c.fetchone()
-        if not msg or msg['sender_id'] != user['id']:
+        if not msg:
             conn.close()
-            return {"status": "error", "message": "Unauthorized"}
+            return {"status": "error", "message": "Message not found"}
+        
+        # Check: either message owner OR has MANAGE_MESSAGES permission
+        is_owner = msg['sender_id'] == user['id']
+        
+        if not is_owner:
+            # Get server_id from channel
+            c.execute("SELECT server_id FROM channels WHERE id = ?", (msg['channel_id'],))
+            channel = c.fetchone()
+            if not channel or not check_permission(user['id'], channel['server_id'], PERM_MANAGE_MESSAGES):
+                conn.close()
+                return {"status": "error", "message": "Yetkiniz yok!"}
             
         c.execute("DELETE FROM channel_messages WHERE id = ?", (message_id,))
         conn.commit()
@@ -194,6 +259,165 @@ async def link_preview(data: dict):
                 "description": description[:200], # Limit length
                 "url": url
             }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# --- FAZ 3: CHAT ENRICHMENT ENDPOINTS ---
+
+@router.post("/message/react")
+async def react_to_message(data: dict):
+    """Add or toggle a reaction on a message."""
+    try:
+        token = data.get('token')
+        message_id = data.get('message_id')
+        emoji = data.get('emoji')
+        
+        if not emoji or not message_id:
+            return {"status": "error", "message": "Missing data"}
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        # Toggle: if already reacted, remove; otherwise add
+        c.execute("SELECT id FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?",
+                  (message_id, user['id'], emoji))
+        existing = c.fetchone()
+        
+        if existing:
+            c.execute("DELETE FROM message_reactions WHERE id = ?", (existing['id'],))
+            action = "removed"
+        else:
+            c.execute("INSERT INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)",
+                      (message_id, user['id'], emoji))
+            action = "added"
+        
+        conn.commit()
+        
+        # Get updated reactions for this message
+        c.execute('''
+            SELECT mr.emoji, u.username 
+            FROM message_reactions mr 
+            JOIN users u ON mr.user_id = u.id 
+            WHERE mr.message_id = ?
+        ''', (message_id,))
+        
+        reactions = {}
+        for r in c.fetchall():
+            if r['emoji'] not in reactions:
+                reactions[r['emoji']] = []
+            reactions[r['emoji']].append(r['username'])
+        
+        conn.close()
+        return {"status": "success", "action": action, "reactions": reactions, "message_id": message_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.post("/message/pin")
+async def pin_message(data: dict):
+    """Pin or unpin a message."""
+    try:
+        token = data.get('token')
+        message_id = data.get('message_id')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        # Get message + channel
+        c.execute("SELECT channel_id, is_pinned FROM channel_messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg:
+            conn.close()
+            return {"status": "error", "message": "Message not found"}
+        
+        # Permission check: MANAGE_MESSAGES
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (msg['channel_id'],))
+        channel = c.fetchone()
+        if channel and not check_permission(user['id'], channel['server_id'], PERM_MANAGE_MESSAGES):
+            conn.close()
+            return {"status": "error", "message": "Yetkiniz yok!"}
+        
+        # Toggle pin
+        new_pin = 0 if msg['is_pinned'] else 1
+        c.execute("UPDATE channel_messages SET is_pinned = ? WHERE id = ?", (new_pin, message_id))
+        conn.commit()
+        conn.close()
+        
+        action = "MESSAGE_PIN" if new_pin else "MESSAGE_UNPIN"
+        if channel:
+            create_audit_log(channel['server_id'], user['id'], action, "MESSAGE", str(message_id))
+        
+        return {"status": "success", "is_pinned": bool(new_pin)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/channel/{channel_id}/pins")
+async def get_pinned_messages(channel_id: str, token: str):
+    """Get all pinned messages in a channel."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        if not c.fetchone():
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        c.execute('''
+            SELECT cm.id, cm.content, cm.timestamp, u.username as sender
+            FROM channel_messages cm
+            JOIN users u ON cm.sender_id = u.id
+            WHERE cm.channel_id = ? AND cm.is_pinned = 1
+            ORDER BY cm.timestamp DESC
+        ''', (channel_id,))
+        
+        pins = [dict(row) for row in c.fetchall()]
+        conn.close()
+        
+        return {"status": "success", "pins": pins}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/channel/{channel_id}/search")
+async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
+    """Search messages in a channel."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        if not c.fetchone():
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        if not q or len(q) < 2:
+            conn.close()
+            return {"status": "error", "message": "Arama en az 2 karakter olmalı"}
+        
+        c.execute('''
+            SELECT cm.id, cm.content, cm.timestamp, u.username as sender
+            FROM channel_messages cm
+            JOIN users u ON cm.sender_id = u.id
+            WHERE cm.channel_id = ? AND cm.content LIKE ?
+            ORDER BY cm.timestamp DESC
+            LIMIT ?
+        ''', (channel_id, f'%{q}%', min(limit, 50)))
+        
+        results = [dict(row) for row in c.fetchall()]
+        conn.close()
+        
+        return {"status": "success", "results": results, "count": len(results)}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -335,10 +559,11 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                 user_row = c.fetchone()
                 if user_row:
                     c.execute('''INSERT INTO channel_messages 
-                                (channel_id, sender_id, content, attachment_url, attachment_type, attachment_name) 
-                                VALUES (?, ?, ?, ?, ?, ?)''', 
+                                (channel_id, sender_id, content, attachment_url, attachment_type, attachment_name, reply_to_id) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?)''', 
                               (room_id, user_row['id'], data.get('text', ""), 
-                               data.get('attachment_url'), data.get('attachment_type'), data.get('attachment_name')))
+                               data.get('attachment_url'), data.get('attachment_type'), data.get('attachment_name'),
+                               data.get('reply_to_id')))
                     conn.commit()
                 conn.close()
                 # ------------------

@@ -73,10 +73,17 @@ def init_db():
                     server_id TEXT NOT NULL,
                     user_id INTEGER NOT NULL,
                     role TEXT DEFAULT 'member',
+                    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(server_id, user_id),
                     FOREIGN KEY(server_id) REFERENCES servers(id),
                     FOREIGN KEY(user_id) REFERENCES users(id)
                 )''')
+    
+    # Migration: Add joined_at if missing
+    try:
+        c.execute("ALTER TABLE members ADD COLUMN joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    except:
+        pass
     
     # Friends table
     c.execute('''CREATE TABLE IF NOT EXISTS friends (
@@ -97,9 +104,13 @@ def init_db():
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     is_read BOOLEAN DEFAULT 0,
                     FOREIGN KEY(sender_id) REFERENCES users(id),
-                    FOREIGN KEY(sender_id) REFERENCES users(id),
                     FOREIGN KEY(receiver_id) REFERENCES users(id)
                 )''')
+
+    # Migration: Add edited_at to DM messages
+    try:
+        c.execute("ALTER TABLE messages ADD COLUMN edited_at TIMESTAMP")
+    except: pass
 
     # ROLES TABLE
     c.execute('''CREATE TABLE IF NOT EXISTS roles (
@@ -131,6 +142,18 @@ def init_db():
                     PRIMARY KEY(sender_id, receiver_id),
                     FOREIGN KEY(receiver_id) REFERENCES users(id)
                 )''')
+
+    # Bans table
+    c.execute('''CREATE TABLE IF NOT EXISTS bans (
+                    server_id TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    banned_by INTEGER,
+                    reason TEXT DEFAULT '',
+                    banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(server_id, user_id),
+                    FOREIGN KEY(server_id) REFERENCES servers(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
                 
     # Server Channel Messages table
     c.execute('''CREATE TABLE IF NOT EXISTS channel_messages (
@@ -160,6 +183,84 @@ def init_db():
         c.execute("ALTER TABLE channel_messages ADD COLUMN edited_at TIMESTAMP")
     except: pass
     # --------------------------
+
+    # --- FAZ 2: AUDIT LOG ---
+    c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    server_id TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    target_type TEXT,
+                    target_id TEXT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(server_id) REFERENCES servers(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
+
+    # --- FAZ 3: CHAT ENRICHMENT ---
+    
+    # Message Reactions
+    c.execute('''CREATE TABLE IF NOT EXISTS message_reactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    emoji TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(message_id, user_id, emoji),
+                    FOREIGN KEY(message_id) REFERENCES channel_messages(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
+
+    # Reply support: add reply_to_id column
+    try:
+        c.execute("ALTER TABLE channel_messages ADD COLUMN reply_to_id INTEGER")
+    except: pass
+
+    # Pin support: add is_pinned column
+    try:
+        c.execute("ALTER TABLE channel_messages ADD COLUMN is_pinned BOOLEAN DEFAULT 0")
+    except: pass
+
+    # --- FAZ 4: ORGANIZATION ---
+    
+    # Channel Categories
+    c.execute('''CREATE TABLE IF NOT EXISTS categories (
+                    id TEXT PRIMARY KEY,
+                    server_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    position INTEGER DEFAULT 0,
+                    FOREIGN KEY(server_id) REFERENCES servers(id)
+                )''')
+    
+    # Channel position + category
+    try:
+        c.execute("ALTER TABLE channels ADD COLUMN category_id TEXT")
+    except: pass
+    try:
+        c.execute("ALTER TABLE channels ADD COLUMN position INTEGER DEFAULT 0")
+    except: pass
+    
+    # Server icon + description
+    try:
+        c.execute("ALTER TABLE servers ADD COLUMN icon_url TEXT")
+    except: pass
+    try:
+        c.execute("ALTER TABLE servers ADD COLUMN description TEXT DEFAULT ''")
+    except: pass
+
+    # Invites table (advanced invite system)
+    c.execute('''CREATE TABLE IF NOT EXISTS invites (
+                    code TEXT PRIMARY KEY,
+                    server_id TEXT NOT NULL,
+                    creator_id INTEGER NOT NULL,
+                    max_uses INTEGER DEFAULT 0,
+                    uses INTEGER DEFAULT 0,
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(server_id) REFERENCES servers(id),
+                    FOREIGN KEY(creator_id) REFERENCES users(id)
+                )''')
 
     conn.commit()
     conn.close()

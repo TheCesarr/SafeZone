@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { getUrl, STUN_SERVERS } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 import toast from '../utils/toast';
+import { NoiseSuppression } from '../audio/NoiseSuppression';
 
 export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedInputId, selectedOutputId, audioSettings) => {
     // Media & Connection Refs
@@ -10,6 +11,9 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     const remoteAudioRefs = useRef({}); // { [uuid]: HTMLAudioElement }
     const screenStreamRef = useRef(null);
     const activeUsersRef = useRef([]);
+    const noiseSuppressionRef = useRef(null); // NoiseSuppression instance
+    const processedStreamRef = useRef(null); // Noise-filtered MediaStream
+    const [isNoiseCancelled, setIsNoiseCancelled] = useState(false);
 
     // Audio Analysis Refs
     const audioContextRef = useRef(null);
@@ -132,11 +136,24 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             })
             localStream.current = stream;
             setActiveVoiceChannel(channel);
-            // setIsMuted(false); // Default to current state (User can pre-mute)
-            // setIsDeafened(false);
 
             // Apply current mute state to new stream
             stream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+
+            // Initialize RNNoise if noise cancellation is enabled
+            if (isNoiseCancelled) {
+                try {
+                    const ns = new NoiseSuppression();
+                    const processed = await ns.init(stream);
+                    if (processed && processed !== stream) {
+                        noiseSuppressionRef.current = ns;
+                        processedStreamRef.current = processed;
+                        console.log('[useWebRTC] RNNoise noise suppression active');
+                    }
+                } catch (e) {
+                    console.error('[useWebRTC] Failed to init noise suppression:', e);
+                }
+            }
 
             SoundManager.playJoin();
 
@@ -182,6 +199,13 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         analyserRef.current = null;
         setSpeakingUsers(new Set());
         SoundManager.playLeave();
+
+        // Cleanup noise suppression
+        if (noiseSuppressionRef.current) {
+            noiseSuppressionRef.current.destroy();
+            noiseSuppressionRef.current = null;
+            processedStreamRef.current = null;
+        }
     }
 
     // --- WebRTC PEER HANDLING ---
@@ -189,7 +213,9 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         const pc = new RTCPeerConnection(STUN_SERVERS);
 
         if (localStream.current) {
-            localStream.current.getAudioTracks().forEach(track => pc.addTrack(track, localStream.current));
+            // Use processed (noise-filtered) stream if available, otherwise raw mic
+            const audioStream = processedStreamRef.current || localStream.current;
+            audioStream.getAudioTracks().forEach(track => pc.addTrack(track, audioStream));
         }
         if (screenStreamRef.current) {
             screenStreamRef.current.getVideoTracks().forEach(track => pc.addTrack(track, screenStreamRef.current));
@@ -202,12 +228,13 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
                     audioElement = new Audio();
                     audioElement.autoplay = true;
                     audioElement.volume = 1.0;
-                    audioElement.muted = isDeafened; // Apply local deafen state
+                    audioElement.muted = isDeafened;
                     if (selectedOutputId && audioElement.setSinkId) {
                         audioElement.setSinkId(selectedOutputId).catch(console.error);
                     }
                     remoteAudioRefs.current = { ...remoteAudioRefs.current, [targetUuid]: audioElement };
                 }
+
                 audioElement.srcObject = event.streams[0];
                 audioElement.play().catch(e => console.error("Play error", e));
             } else if (event.track.kind === 'video') {
@@ -386,9 +413,11 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             // Handle stream stop (user clicks "Stop Sharing" in browser UI)
             stream.getVideoTracks()[0].onended = () => stopScreenShare();
 
-            // Add tracks to existing connections and renegotiate
+            // Add ONLY video tracks to existing connections (keep audio untouched)
             const promises = Object.entries(peerConnections.current).map(async ([targetUuid, pc]) => {
-                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                stream.getVideoTracks().forEach(track => pc.addTrack(track, stream));
+                // If screen has audio, add that too but separately
+                stream.getAudioTracks().forEach(track => pc.addTrack(track, stream));
 
                 // Renegotiate
                 const offer = await pc.createOffer();
@@ -411,28 +440,45 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     const stopScreenShare = async () => {
         if (!screenStreamRef.current) return;
 
-        // Stop tracks
-        screenStreamRef.current.getTracks().forEach(t => t.stop());
+        const screenTracks = screenStreamRef.current.getTracks();
+        screenTracks.forEach(t => t.stop());
         screenStreamRef.current = null;
 
-        // Valid way to remove tracks in raw WebRTC without full renegotiation is tricky, 
-        // but usually we just stop sending. 
-        // For correct state, we should remove sender or replace track with null.
-        // Simplified: Just signal, and remote will stop receiving frames. 
-        // But to clean up, let's remove senders.
         Object.values(peerConnections.current).forEach(pc => {
-            const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
-            senders.forEach(s => pc.removeTrack(s));
-            // Renegotiation might be needed to tell remote to remove track?
-            // For now, let's just rely on the signal to update UI.
+            const senders = pc.getSenders();
+            senders.forEach(s => {
+                if (s.track && screenTracks.includes(s.track)) {
+                    try {
+                        pc.removeTrack(s);
+                    } catch (e) {
+                        console.error("Error removing track:", e);
+                    }
+                }
+            });
         });
 
-        // If we want to truly remove the track from remote, we need to renegotiate.
-        // Let's try renegotiating removal.
+        // Detect if we need to restore audio (if it was somehow lost/replaced)
+        // But with removeTrack, we just removed the extra senders.
+        // We still need to verify the primary audio sender exists.
         const promises = Object.entries(peerConnections.current).map(async ([targetUuid, pc]) => {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
+            const senders = pc.getSenders();
+            const hasAudio = senders.some(s => s.track && s.track.kind === 'audio' && s.track.readyState === 'live');
+
+            if (!hasAudio && localStream.current) {
+                // Re-add mic track if missing
+                const micTrack = localStream.current.getAudioTracks()[0];
+                if (micTrack) {
+                    // Check if there is an empty audio sender we can reuse?
+                    // Or just addTrack
+                    pc.addTrack(micTrack, localStream.current);
+                }
+            }
+
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
+            } catch (e) { console.error("Renegotiation error:", e); }
         });
         await Promise.all(promises);
 
@@ -473,6 +519,58 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         // Refs (if needed directly)
         peerConnections,
         remoteAudioRefs,
-        screenStreamRef
+        screenStreamRef,
+
+        // Noise Cancellation
+        isNoiseCancelled,
+        toggleNoiseCancellation: async () => {
+            const newState = !isNoiseCancelled;
+            setIsNoiseCancelled(newState);
+
+            if (newState && localStream.current) {
+                // Enable: Create noise suppression and replace tracks
+                try {
+                    const ns = new NoiseSuppression();
+                    const processed = await ns.init(localStream.current);
+                    if (processed && processed !== localStream.current) {
+                        noiseSuppressionRef.current = ns;
+                        processedStreamRef.current = processed;
+
+                        // Replace audio track in all peer connections
+                        const newTrack = processed.getAudioTracks()[0];
+                        if (newTrack) {
+                            Object.values(peerConnections.current).forEach(pc => {
+                                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+                                if (sender) sender.replaceTrack(newTrack);
+                            });
+                        }
+                        toast.success('AI Gürültü Engelleme açıldı');
+                    }
+                } catch (e) {
+                    console.error('[useWebRTC] Failed to enable noise suppression:', e);
+                    setIsNoiseCancelled(false);
+                    toast.error('Gürültü engelleme başlatılamadı');
+                }
+            } else {
+                // Disable: Destroy noise suppression and restore raw track
+                if (noiseSuppressionRef.current) {
+                    noiseSuppressionRef.current.destroy();
+                    noiseSuppressionRef.current = null;
+                    processedStreamRef.current = null;
+                }
+
+                // Restore original mic track in all peer connections
+                if (localStream.current) {
+                    const rawTrack = localStream.current.getAudioTracks()[0];
+                    if (rawTrack) {
+                        Object.values(peerConnections.current).forEach(pc => {
+                            const sender = pc.getSenders().find(s => s.track?.kind === 'audio');
+                            if (sender) sender.replaceTrack(rawTrack);
+                        });
+                    }
+                }
+                toast.success('AI Gürültü Engelleme kapatıldı');
+            }
+        }
     };
 }

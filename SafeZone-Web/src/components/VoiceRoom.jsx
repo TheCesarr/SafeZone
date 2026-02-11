@@ -8,7 +8,10 @@ const VoiceRoom = ({
     screenStreamRef,
     connectedUsers,
     voiceStates,
-    activeVoiceChannel
+    activeVoiceChannel,
+    remoteAudioRefs,
+    serverMembers,
+    colors
 }) => {
     const [watchingStreamId, setWatchingStreamId] = useState(null);
     const [streamWindow, setStreamWindow] = useState({ x: 50, y: 50, width: 800, height: 450 });
@@ -100,7 +103,12 @@ const VoiceRoom = ({
                         return (
                             <div key={uuid} style={{ position: 'relative', width: '300px', height: '170px', backgroundColor: '#202225', borderRadius: '8px', border: '2px solid #202225', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                                 <div style={{ fontSize: '40px' }}>🖥️</div>
-                                <div style={{ color: '#fff', fontWeight: 'bold' }}>{activeUsersRef.current.find(u => u.uuid === uuid)?.username || "Kullanıcı"} Yayında</div>
+                                <div style={{ color: '#fff', fontWeight: 'bold' }}>
+                                    {(() => {
+                                        const user = serverMembers?.find(m => m.uuid === uuid || m.username === uuid) || activeUsersRef.current.find(u => u.uuid === uuid) || { username: uuid };
+                                        return (user.display_name || user.username || uuid);
+                                    })()} Yayında
+                                </div>
                                 <button
                                     onClick={() => setWatchingStreamId(uuid)}
                                     style={{ padding: '8px 16px', background: '#3BA55C', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -123,8 +131,26 @@ const VoiceRoom = ({
                                 playsInline
                                 style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
                             />
-                            <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', color: 'white', fontSize: '12px', fontWeight: 'bold' }}>
-                                {activeUsersRef.current.find(u => u.uuid === uuid)?.username || uuid}
+                            <div style={{ position: 'absolute', bottom: '10px', left: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px' }}>
+                                <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
+                                    {(() => {
+                                        const user = serverMembers?.find(m => m.uuid === uuid || m.username === uuid) || activeUsersRef.current.find(u => u.uuid === uuid) || { username: uuid };
+                                        return (user.display_name || user.username || uuid);
+                                    })()}
+                                </span>
+                                {remoteAudioRefs?.current?.[uuid] && (
+                                    <input
+                                        type="range"
+                                        min="0" max="100" step="1"
+                                        defaultValue="100"
+                                        onChange={(e) => {
+                                            const audio = remoteAudioRefs.current[uuid];
+                                            if (audio) audio.volume = e.target.value / 100;
+                                        }}
+                                        title="Ses Seviyesi"
+                                        style={{ width: '80px', height: '4px', cursor: 'pointer', accentColor: '#3BA55C' }}
+                                    />
+                                )}
                             </div>
                         </div>
                     );
@@ -154,19 +180,37 @@ const VoiceRoom = ({
                         <p>Henüz kimse ekran paylaşmıyor.</p>
                         {connectedUsers.length > 0 && (
                             <div style={{ display: 'flex', gap: '15px', marginTop: '20px' }}>
-                                {connectedUsers.map(u => (
-                                    <div key={u.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                        <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', color: 'white', border: voiceStates[u.uuid]?.isScreenSharing ? '3px solid #34C759' : '3px solid transparent' }}>
-                                            {(u.username || "?").slice(0, 2).toUpperCase()}
+                                {connectedUsers.map(u => {
+                                    const user = serverMembers?.find(m => m.uuid === u.uuid || m.username === u.uuid) || u;
+                                    const displayName = user.display_name || user.username || u.uuid;
+
+                                    return (
+                                        <div key={u.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                            <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', color: 'white', border: voiceStates[u.uuid]?.isScreenSharing ? '3px solid #34C759' : '3px solid transparent' }}>
+                                                {(displayName || "?").slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <span style={{ color: '#aaa', marginTop: '8px', fontSize: '13px' }}>{displayName}</span>
+                                            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                                {voiceStates[u.uuid]?.isScreenSharing && <span style={{ fontSize: '12px' }} title="Yayında">📺</span>}
+                                                {voiceStates[u.uuid]?.isMuted && <span style={{ fontSize: '12px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Susturuldu">🎙️</span>}
+                                                {voiceStates[u.uuid]?.isDeafened && <span style={{ fontSize: '12px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Sağırlaştırıldı">🎧</span>}
+                                            </div>
+                                            {remoteAudioRefs?.current?.[u.uuid] && (
+                                                <input
+                                                    type="range"
+                                                    min="0" max="100" step="1"
+                                                    defaultValue="100"
+                                                    onChange={(e) => {
+                                                        const audio = remoteAudioRefs.current[u.uuid];
+                                                        if (audio) audio.volume = e.target.value / 100;
+                                                    }}
+                                                    title="Ses Seviyesi"
+                                                    style={{ width: '60px', height: '3px', cursor: 'pointer', accentColor: '#5865F2', marginTop: '4px' }}
+                                                />
+                                            )}
                                         </div>
-                                        <span style={{ color: '#aaa', marginTop: '8px', fontSize: '13px' }}>{u.username}</span>
-                                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                                            {voiceStates[u.uuid]?.isScreenSharing && <span style={{ fontSize: '12px' }} title="Yayında">📺</span>}
-                                            {voiceStates[u.uuid]?.isMuted && <span style={{ fontSize: '12px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Susturuldu">🎙️</span>}
-                                            {voiceStates[u.uuid]?.isDeafened && <span style={{ fontSize: '12px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Sağırlaştırıldı">🎧</span>}
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -195,7 +239,10 @@ const VoiceRoom = ({
                     {/* Header/Overlay */}
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2, cursor: 'move' }}>
                         <span style={{ color: '#fff', fontWeight: 'bold', textShadow: '0 1px 2px #000' }}>
-                            {activeUsersRef.current.find(u => u.uuid === watchingStreamId)?.username || "Yayın"}
+                            {(() => {
+                                const user = serverMembers?.find(m => m.uuid === watchingStreamId || m.username === watchingStreamId) || activeUsersRef.current.find(u => u.uuid === watchingStreamId);
+                                return (user?.display_name || user?.username || "Yayın");
+                            })()}
                         </span>
                         <button
                             onClick={(e) => { e.stopPropagation(); setWatchingStreamId(null); }}

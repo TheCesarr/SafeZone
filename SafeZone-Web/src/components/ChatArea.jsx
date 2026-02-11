@@ -32,7 +32,7 @@ const ChatArea = ({
     const fileInputRef = useRef(null);
 
     return (
-        <>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
             <div style={{ flexGrow: 1, padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {currentMessages.map((msg, i) => {
                     const sender = typeof msg === 'string' ? msg.split(': ')[0] : (selectedDM ? msg.sender : msg.sender);
@@ -310,7 +310,7 @@ const ChatArea = ({
                     />
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 

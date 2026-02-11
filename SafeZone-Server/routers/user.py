@@ -89,3 +89,69 @@ async def upload_avatar(token: str = Form(...), file: UploadFile = File(...)):
         
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@router.post("/status")
+async def update_status(data: dict):
+    """Update user online status (online, idle, dnd, offline)."""
+    try:
+        token = data.get('token')
+        new_status = data.get('status', 'online')
+        
+        if new_status not in ['online', 'idle', 'dnd', 'offline']:
+            return {"status": "error", "message": "Invalid status"}
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        c.execute("UPDATE users SET status = ? WHERE id = ?", (new_status, user['id']))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "user_status": new_status}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/profile/{username}")
+async def get_user_profile(username: str, token: str):
+    """Get a user's public profile."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        if not c.fetchone():
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        c.execute("""
+            SELECT username, display_name, discriminator, avatar_color, avatar_url, status
+            FROM users WHERE username = ?
+        """, (username,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "User not found"}
+        
+        profile = dict(user)
+        
+        # Get mutual servers
+        c.execute("""
+            SELECT s.id, s.name, s.icon_url 
+            FROM servers s
+            JOIN members m1 ON s.id = m1.server_id
+            JOIN members m2 ON s.id = m2.server_id
+            JOIN users u1 ON m1.user_id = u1.id AND u1.token = ?
+            JOIN users u2 ON m2.user_id = u2.id AND u2.username = ?
+        """, (token, username))
+        profile['mutual_servers'] = [dict(row) for row in c.fetchall()]
+        
+        conn.close()
+        return {"status": "success", "profile": profile}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

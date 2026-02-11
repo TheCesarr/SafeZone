@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { getUrl } from '../utils/api';
 
 const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart }) => {
 
@@ -100,7 +101,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                                     fontSize: '14px'
                                 }}>
                                     {member.avatar_url ? (
-                                        <img src={member.avatar_url} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                        <img src={getUrl(member.avatar_url)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                                     ) : (
                                         member.username.substring(0, 2).toUpperCase()
                                     )}
@@ -169,7 +170,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                                     filter: 'grayscale(100%)' // Grayscale for offline
                                 }}>
                                     {member.avatar_url ? (
-                                        <img src={member.avatar_url} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                        <img src={getUrl(member.avatar_url)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                                     ) : (
                                         member.username.substring(0, 2).toUpperCase()
                                     )}

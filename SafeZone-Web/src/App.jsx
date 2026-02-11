@@ -373,12 +373,12 @@ function App() {
         authState={authState}
         isMuted={webrtc.isMuted}
         isDeafened={webrtc.isDeafened}
-        isNoiseCancelled={audioSettings.noiseSuppression}
+        isNoiseCancelled={webrtc.isNoiseCancelled}
         ping={lobby.ping}
         onDisconnect={webrtc.disconnectVoice}
         onToggleMute={webrtc.toggleMute}
         onToggleDeafen={webrtc.toggleDeafen}
-        onToggleNoiseCancellation={() => setAudioSettings(prev => ({ ...prev, noiseSuppression: !prev.noiseSuppression }))}
+        onToggleNoiseCancellation={webrtc.toggleNoiseCancellation}
         onStatusChange={lobby.handleStatusChange}
         onScreenShare={webrtc.startScreenShare}
         stopScreenShare={webrtc.stopScreenShare}
@@ -451,6 +451,8 @@ function App() {
               activeUsersRef={{ current: webrtc.connectedUsers }}
               isScreenSharing={webrtc.isScreenSharing}
               screenStreamRef={webrtc.screenStreamRef}
+              remoteAudioRefs={webrtc.remoteAudioRefs}
+              serverMembers={serverData.serverMembers}
             />
           ) : (
             <FriendsDashboard

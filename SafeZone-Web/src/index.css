@@ -168,6 +168,18 @@ body {
   }
 }
 
+@keyframes noisePulse {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(59, 165, 92, 0.3));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px rgba(59, 165, 92, 0.7));
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;

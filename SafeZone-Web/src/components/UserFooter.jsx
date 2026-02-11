@@ -141,6 +141,18 @@ const UserFooter = ({
                     <span style={{ fontSize: '14px', fontWeight: '600', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{authState.user.display_name || authState.user.username}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '11px', color: mutedColor, flexShrink: 0 }}>#{authState.user.discriminator || '0001'}</span>
+                        {ping !== null && (
+                            <span style={{
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                color: ping < 80 ? '#3BA55C' : ping < 150 ? '#FAA61A' : '#ED4245',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                            }}>
+                                <span style={{ fontSize: '8px' }}>●</span> {ping}ms
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -185,13 +197,17 @@ const UserFooter = ({
                     <button
                         onClick={onToggleNoiseCancellation}
                         className="interactive-button"
-                        title={isNoiseCancelled ? 'Gürültü Engelleme: AÇIK' : 'Gürültü Engelleme: KAPALI'}
+                        title={isNoiseCancelled ? 'AI Gürültü Engelleme: AÇIK (RNNoise)' : 'AI Gürültü Engelleme: KAPALI'}
                         style={{
                             background: 'transparent',
                             border: 'none',
                             color: isNoiseCancelled ? '#3BA55C' : mutedColor,
                             padding: '8px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            position: 'relative',
+                            ...(isNoiseCancelled ? {
+                                animation: 'noisePulse 2s ease-in-out infinite',
+                            } : {})
                         }}
                     >
                         <IconNoise />

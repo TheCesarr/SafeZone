@@ -30,7 +30,7 @@ async def add_friend(data: dict):
         c = conn.cursor()
         
         # 1. Validate me
-        c.execute("SELECT id, username FROM users WHERE token = ?", (token,))
+        c.execute("SELECT id, username, discriminator FROM users WHERE token = ?", (token,))
         user = c.fetchone()
         if not user:
             conn.close()
@@ -71,7 +71,7 @@ async def add_friend(data: dict):
                  await lobby.active_connections[friend['username']].send_text(json.dumps({
                      "type": "friend_request",
                      "sender": user['username'],
-                     "discriminator": "???", 
+                     "discriminator": user['discriminator'] or '0001', 
                  }))
              except: pass
         
@@ -334,6 +334,8 @@ async def get_dm_history(data: dict):
     try:
         token = data.get('token')
         other_username = data.get('username')
+        before_id = data.get('before_id')  # pagination
+        limit = min(data.get('limit', 50), 100)
         
         conn = get_db_connection()
         c = conn.cursor()
@@ -346,26 +348,105 @@ async def get_dm_history(data: dict):
         other = c.fetchone()
         if not other: return {"status": "error"}
         
-        # Get history
-        c.execute('''
-            SELECT m.content, m.timestamp, u.username as sender
-            FROM messages m
-            JOIN users u ON m.sender_id = u.id
-            WHERE (m.sender_id = ? AND m.receiver_id = ?) 
-               OR (m.sender_id = ? AND m.receiver_id = ?)
-            ORDER BY m.timestamp ASC
-            LIMIT 50
-        ''', (me['id'], other['id'], other['id'], me['id']))
+        # Get history with pagination
+        if before_id:
+            c.execute('''
+                SELECT m.id, m.content, m.timestamp, m.edited_at, u.username as sender
+                FROM messages m
+                JOIN users u ON m.sender_id = u.id
+                WHERE ((m.sender_id = ? AND m.receiver_id = ?) 
+                   OR (m.sender_id = ? AND m.receiver_id = ?))
+                   AND m.id < ?
+                ORDER BY m.timestamp DESC
+                LIMIT ?
+            ''', (me['id'], other['id'], other['id'], me['id'], before_id, limit))
+        else:
+            c.execute('''
+                SELECT m.id, m.content, m.timestamp, m.edited_at, u.username as sender
+                FROM messages m
+                JOIN users u ON m.sender_id = u.id
+                WHERE (m.sender_id = ? AND m.receiver_id = ?) 
+                   OR (m.sender_id = ? AND m.receiver_id = ?)
+                ORDER BY m.timestamp DESC
+                LIMIT ?
+            ''', (me['id'], other['id'], other['id'], me['id'], limit))
         
+        rows = c.fetchall()
         messages = []
-        for row in c.fetchall():
+        for row in rows:
             messages.append({
+                "id": row['id'],
                 "sender": row['sender'],
                 "content": row['content'],
-                "timestamp": row['timestamp']
+                "timestamp": row['timestamp'],
+                "edited_at": row['edited_at']
             })
+        
+        messages.reverse()  # Back to chronological
             
         conn.close()
         return {"status": "success", "messages": messages}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.post("/dm/edit")
+async def edit_dm(data: dict):
+    """Edit a DM message (sender only)."""
+    try:
+        token = data.get('token')
+        message_id = data.get('message_id')
+        new_content = data.get('content')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        c.execute("SELECT sender_id FROM messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg or msg['sender_id'] != user['id']:
+            conn.close()
+            return {"status": "error", "message": "Unauthorized"}
+        
+        c.execute("UPDATE messages SET content = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?",
+                  (new_content, message_id))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.post("/dm/delete")
+async def delete_dm(data: dict):
+    """Delete a DM message (sender only)."""
+    try:
+        token = data.get('token')
+        message_id = data.get('message_id')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        
+        c.execute("SELECT sender_id FROM messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg or msg['sender_id'] != user['id']:
+            conn.close()
+            return {"status": "error", "message": "Unauthorized"}
+        
+        c.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

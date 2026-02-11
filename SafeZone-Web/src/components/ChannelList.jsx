@@ -190,8 +190,10 @@ const ChannelList = ({
                                 {ch.type === 'voice' && roomDetails[ch.id] && roomDetails[ch.id].length > 0 && (
                                     <div style={{ paddingLeft: '28px', marginBottom: '8px' }}>
                                         {roomDetails[ch.id].map(uid => {
-                                            const isCurrentUser = authState.user && uid === authState.user.username; // Need to verify uuid vs username, assume username for now based on App.jsx
-                                            const isSpeaking = speakingUsers.has(uid);
+                                            const member = serverMembers.find(m => m.username === uid || m.id === uid || m.uuid === uid);
+                                            const displayName = member ? (member.display_name || member.username) : uid;
+                                            const isCurrentUser = authState.user && (uid === authState.user.username || uid === authState.user.uuid);
+
                                             return (
                                                 <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                                                     <div style={{
@@ -208,9 +210,11 @@ const ChannelList = ({
                                                         boxShadow: isSpeaking ? '0 0 8px #34C759' : 'none',
                                                         transition: 'all 0.2s ease'
                                                     }}>
-                                                        {uid.slice(0, 1).toUpperCase()}
+                                                        {displayName.slice(0, 1).toUpperCase()}
                                                     </div>
-                                                    <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa' }}>{uid}</span>
+                                                    <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title={displayName}>
+                                                        {displayName}
+                                                    </span>
                                                     {/* Show mute/deafen icons for all users */}
                                                     {(() => {
                                                         const userVoiceState = isCurrentUser ? { isMuted, isDeafened, isScreenSharing } : (voiceStates[uid] || {});

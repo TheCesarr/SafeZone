@@ -17,13 +17,8 @@ class Lobby:
         self.active_connections: Dict[str, WebSocket] = {}
 
 # --- Global Instances ---
-rooms: Dict[str, VoiceRoom] = {
-    "sohbet-1": VoiceRoom("sohbet-1", "💬 Genel Sohbet"),
-    "oyun-1":   VoiceRoom("oyun-1",   "🎮 Valorant Ekibi"),
-    "oyun-2":   VoiceRoom("oyun-2",   "⛏️ Minecraft"),
-    "muzik-1":  VoiceRoom("muzik-1",  "🎵 Müzik Odası"),
-    "afk-1":    VoiceRoom("afk-1",    "💤 AFK"),
-}
+# Rooms are created dynamically when users join voice channels (see chat.py room_endpoint)
+rooms: Dict[str, VoiceRoom] = {}
 
 lobby = Lobby()
 
