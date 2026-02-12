@@ -1,5 +1,12 @@
-const { app, BrowserWindow, desktopCapturer, session } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session, ipcMain } = require('electron');
 const path = require('path');
+let buildConfig = { type: 'client', adminSecret: '' };
+try {
+    buildConfig = require('./build_config.cjs');
+    console.log(`[Electron] Build Type: ${buildConfig.type}`);
+} catch (e) {
+    console.error("[Electron] Could not load build_config.cjs, defaulting to client.", e);
+}
 
 // Ignore SSL errors (MANDATORY for Self-Signed Certs)
 app.commandLine.appendSwitch('ignore-certificate-errors');
@@ -11,22 +18,27 @@ app.disableHardwareAcceleration();
 
 // Forcefully accept all certificates (Critical for WSS connection)
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
-    // On certificate error we disable default behaviour (stop loading the page)
-    // and we then say "it is all fine - true" to the callback
     event.preventDefault();
     callback(true);
 });
+
+// IPC Handlers for Dual Build
+ipcMain.handle('get-build-type', () => buildConfig.type);
+ipcMain.handle('get-admin-secret', () => buildConfig.adminSecret);
 
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false, // Security: Disable nodeIntegration (we use preload)
+            contextIsolation: false, // We enabled contextIsolation=false in preload logic for now to expose window.SAFEZONE_API easily, or we can use true + contextBridge.
+            // Wait, my preload uses window.SAFEZONE_API and I said "contextIsolation: false".
+            // If I set nodeIntegration: false, I rely on preload.
+            preload: path.join(__dirname, 'preload.cjs'),
             webSecurity: false
         },
-        title: "SafeZone",
+        title: `SafeZone ${buildConfig.type === 'admin' ? 'Admin' : 'Client'}`,
         backgroundColor: '#121212',
         show: false,
         autoHideMenuBar: true
@@ -46,7 +58,7 @@ function createWindow() {
     win.once('ready-to-show', () => {
         win.show();
         // Open DevTools to debug black screen
-        win.webContents.openDevTools();
+        // win.webContents.openDevTools();
     });
 
     // Retry logic for dev server startup race condition
@@ -60,15 +72,12 @@ function createWindow() {
     win.setMenuBarVisibility(false);
 
     // Handle Screen Share Requests (getDisplayMedia)
-    // Electron requires explicit handling. For now, we auto-select the entire screen.
-    // In the future, we can build a custom picker UI.
     win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
         desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
             // Grant access to the first screen available.
             callback({ video: sources[0], audio: 'loopback' });
         }).catch((err) => {
             console.error(err);
-            // callback(null); // Cancel if error
         });
     });
 }

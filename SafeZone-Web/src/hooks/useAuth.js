@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getUrl } from '../utils/api';
+import { useToast } from './useToast'; // Correct import if needed, assuming useToast handles its own import or passed via context. actually App.jsx passes it? No App.jsx uses it.
+// Wait, useAuth doesn't use useToast in the original code, it imports `toast` from utils.
 import toast from '../utils/toast';
 
 export const useAuth = () => {
@@ -27,7 +29,9 @@ export const useAuth = () => {
                             user: {
                                 username: data.username,
                                 display_name: data.display_name,
-                                discriminator: data.discriminator
+                                discriminator: data.discriminator,
+                                email: data.email,
+                                is_sysadmin: data.is_sysadmin
                             }
                         });
                     } else {
@@ -40,13 +44,13 @@ export const useAuth = () => {
         checkToken();
     }, []);
 
-    const handleLogin = async (username, password) => {
+    const handleLogin = async (email, password) => {
         setAuthError(null);
         try {
             const res = await fetch(getUrl('/auth/login'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, password })
             });
             const data = await res.json();
             if (data.status === 'success') {
@@ -56,7 +60,9 @@ export const useAuth = () => {
                     user: {
                         username: data.username,
                         display_name: data.display_name,
-                        discriminator: data.discriminator
+                        discriminator: data.discriminator,
+                        email: data.email,
+                        is_sysadmin: data.is_sysadmin
                     }
                 });
             } else {
@@ -68,7 +74,7 @@ export const useAuth = () => {
         }
     }
 
-    const handleRegister = async (username, password, displayName, pin) => {
+    const handleRegister = async (username, email, password, displayName, pin) => {
         setAuthError(null);
         try {
             const res = await fetch(getUrl('/auth/register'), {
@@ -76,6 +82,7 @@ export const useAuth = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username,
+                    email,
                     password,
                     display_name: displayName,
                     recovery_pin: pin
@@ -89,7 +96,9 @@ export const useAuth = () => {
                     user: {
                         username: data.username,
                         display_name: data.display_name,
-                        discriminator: data.discriminator
+                        discriminator: data.discriminator,
+                        email: data.email,
+                        is_sysadmin: false // Default false
                     }
                 });
             } else {
@@ -101,14 +110,14 @@ export const useAuth = () => {
         }
     }
 
-    const handleResetPassword = async (username, pin, newPassword) => {
+    const handleResetPassword = async (email, pin, newPassword) => {
         setAuthError(null);
         try {
             const res = await fetch(getUrl('/auth/reset'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    username,
+                    email,
                     recovery_pin: pin,
                     new_password: newPassword
                 })
@@ -127,6 +136,36 @@ export const useAuth = () => {
         }
     }
 
+    const handleAdminLogin = async (secret) => {
+        setAuthError(null);
+        try {
+            const res = await fetch(getUrl('/auth/admin-login'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ secret })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                localStorage.setItem('safezone_token', data.token);
+                setAuthState({
+                    token: data.token,
+                    user: {
+                        username: data.username,
+                        display_name: data.display_name,
+                        discriminator: data.discriminator,
+                        email: data.email,
+                        is_sysadmin: data.is_sysadmin
+                    }
+                });
+            } else {
+                setAuthError(data.message);
+            }
+        } catch (err) {
+            setAuthError('Admin Giriş Hatası!');
+            console.error(err);
+        }
+    }
+
     const handleLogout = () => {
         localStorage.removeItem('safezone_token');
         setAuthState({ token: null, user: null });
@@ -141,6 +180,7 @@ export const useAuth = () => {
         handleLogin,
         handleRegister,
         handleResetPassword,
-        handleLogout
+        handleLogout,
+        handleAdminLogin
     };
 }

@@ -39,6 +39,8 @@ const ChannelList = ({
     stopScreenShare,
     onStatusChange,
     userStatuses,
+    unreadChannels, // Set<channelId>
+    unreadDMs, // Set<username>
     children
 }) => {
     return (
@@ -97,6 +99,7 @@ const ChannelList = ({
                                 <div key={friend.username} style={{ padding: '10px', marginBottom: '2px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                                            {unreadDMs?.has(friend.username) && <div style={{ position: 'absolute', top: -2, right: -2, width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ED4245', border: '2px solid #2f3136' }}></div>}
                                             {friend.username.slice(0, 2).toUpperCase()}
                                             {onlineUserIds.includes(friend.username) && (
                                                 <div style={{
@@ -184,7 +187,8 @@ const ChannelList = ({
                                     }}
                                 >
                                     <span style={{ flexShrink: 0 }}>{ch.type === 'voice' ? '🔊' : '💬'}</span>
-                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ch.name}</span>
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: unreadChannels?.has(ch.id) ? 'bold' : 'normal', color: unreadChannels?.has(ch.id) ? '#fff' : 'inherit' }}>{ch.name}</span>
+                                    {unreadChannels?.has(ch.id) && <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fff', marginLeft: 'auto' }}></div>}
                                 </div>
                                 {/* ACTIVE VOICE USERS AVATARS (Always from Lobby RoomDetails) */}
                                 {ch.type === 'voice' && roomDetails[ch.id] && roomDetails[ch.id].length > 0 && (
@@ -206,8 +210,8 @@ const ChannelList = ({
                                                         justifyContent: 'center',
                                                         fontSize: '8px',
                                                         color: 'white',
-                                                        border: isSpeaking ? '2px solid #34C759' : '2px solid transparent',
-                                                        boxShadow: isSpeaking ? '0 0 8px #34C759' : 'none',
+                                                        border: speakingUsers.has(uid) ? '2px solid #34C759' : '2px solid transparent',
+                                                        boxShadow: speakingUsers.has(uid) ? '0 0 8px #34C759' : 'none',
                                                         transition: 'all 0.2s ease'
                                                     }}>
                                                         {displayName.slice(0, 1).toUpperCase()}
@@ -239,7 +243,8 @@ const ChannelList = ({
                 <div style={{ flexGrow: 1, padding: '20px', color: colors?.textMuted || '#666', textAlign: 'center', marginTop: '50px' }}>
                     <p>Bir sunucu seçin veya oluşturun.</p>
                 </div>
-            )}
+            )
+            }
 
             <UserFooter
                 authState={authState}
@@ -261,7 +266,7 @@ const ChannelList = ({
             />
 
             {children}
-        </div>
+        </div >
     );
 };
 

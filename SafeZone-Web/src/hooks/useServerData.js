@@ -179,7 +179,7 @@ export const useServerData = (authState) => {
                 body: JSON.stringify({ token: authState.token, friend_tag: friendTag })
             });
             const data = await res.json();
-            if (data.status === 'success') { fetchFriends(); return true; }
+            if (data.status === 'success') { toast.success("Arkadaşlık isteği gönderildi!"); fetchFriends(); return true; }
             else { toast.error(data.message); return false; }
         } catch (e) { console.error(e); return false; }
     }
@@ -196,13 +196,17 @@ export const useServerData = (authState) => {
         } catch (e) { console.error(e); }
     }
 
-    const respondFriendRequest = async (requestId, action) => {
+    const respondFriendRequest = async (senderUsername, action) => {
         try {
-            await fetch(getUrl('/friends/respond'), {
+            const res = await fetch(getUrl('/friends/respond'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authState.token, request_id: requestId, action: action })
+                body: JSON.stringify({ token: authState.token, sender_username: senderUsername, action: action })
             });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.success(action === 'accept' ? 'Arkadaşlık kabul edildi!' : 'İstek reddedildi.');
+            }
             fetchFriends();
         } catch (e) { console.error(e); }
     }

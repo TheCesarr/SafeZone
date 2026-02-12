@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { getUrl } from '../utils/api';
 
-const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart }) => {
+const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu }) => {
 
     // Group members: Online, Offline
     const groupedMembers = useMemo(() => {
@@ -86,6 +86,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                         }}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.cardHover}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            onContextMenu={(e) => handleUserContextMenu(e, member)}
                         >
                             <div style={{ position: 'relative', marginRight: '10px' }}>
                                 <div style={{
@@ -154,6 +155,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                         }}
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.cardHover; e.currentTarget.style.opacity = 0.8; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.opacity = 0.5; }}
+                            onContextMenu={(e) => handleUserContextMenu(e, member)}
                         >
                             <div style={{ marginRight: '10px' }}>
                                 <div style={{

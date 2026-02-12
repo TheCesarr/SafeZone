@@ -1,7 +1,7 @@
 {
   "name": "safezone-web",
   "private": true,
-  "version": "1.5.1",
+  "version": "1.6.5",
   "main": "electron/main.cjs",
   "type": "module",
   "description": "SafeZone - Secure Voice Chat",
@@ -12,7 +12,11 @@
     "preview": "vite preview",
     "electron": "wait-on tcp:5173 && electron .",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"npm run electron\"",
-    "dist": "vite build && electron-builder"
+    "start:client": "node set-build.cjs client && npm run electron:dev",
+    "start:admin": "node set-build.cjs admin && npm run electron:dev",
+    "dist": "vite build && electron-builder",
+    "build:client": "node set-build.cjs client && npm run dist",
+    "build:admin": "node set-build.cjs admin && npm run dist"
   },
   "build": {
     "appId": "com.safezone.app",

@@ -11,7 +11,10 @@ const ServerSidebar = ({
     onJoinServerClick,
     onSettingsClick,
     handleServerRightClick,
-    colors
+    colors,
+    unreadChannels,
+    unreadDMs,
+    friendRequestsCount
 }) => {
     // Dynamic Styles
     const sidebarBg = colors?.sidebar || 'rgba(10, 10, 15, 0.6)';
@@ -43,19 +46,55 @@ const ServerSidebar = ({
                 }}
             >
                 👥
+                {/* Friend Requests Badge */}
+                {friendRequestsCount > 0 && <div style={{ position: 'absolute', bottom: -2, right: -2, minWidth: '16px', height: '16px', borderRadius: '8px', backgroundColor: '#ED4245', border: '2px solid #202225', color: '#fff', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', padding: '0 2px' }}>{friendRequestsCount}</div>}
+
+                {/* Unread DMs Badge (if no pending requests but unread DMs exist) */}
+                {friendRequestsCount === 0 && unreadDMs?.size > 0 && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#fff', border: '2px solid #202225' }}></div>}
             </div>
 
             <div style={{ width: '48px', height: '2px', backgroundColor: borderColor }} />
 
-            {myServers.map(s => (
-                <ServerIcon
-                    key={s.id}
-                    server={s}
-                    selected={selectedServer?.id === s.id}
-                    onClick={() => onServerClick(s)}
-                    onContextMenu={(e) => handleServerRightClick(e, s)}
-                />
-            ))}
+            {/* Admin Panel Button */}
+            {isSysAdmin && (
+                <>
+                    <div
+                        title="Admin Paneli"
+                        onClick={onAdminClick}
+                        style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '50%',
+                            backgroundColor: '#ed4245',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '20px',
+                            border: `1px solid ${borderColor}`,
+                            marginBottom: '10px'
+                        }}
+                    >
+                        🛡️
+                    </div>
+                    <div style={{ width: '48px', height: '2px', backgroundColor: borderColor }} />
+                </>
+            )}
+
+            {myServers.map(s => {
+                const hasUnread = s.channels?.some(ch => unreadChannels?.has(ch.id));
+                return (
+                    <ServerIcon
+                        key={s.id}
+                        server={s}
+                        selected={selectedServer?.id === s.id}
+                        onClick={() => onServerClick(s)}
+                        onContextMenu={(e) => handleServerRightClick(e, s)}
+                        hasUnread={hasUnread}
+                    />
+                );
+            })}
             <div style={{ width: '48px', height: '2px', backgroundColor: borderColor }} />
             <div title="Sunucu Oluştur" onClick={onCreateServerClick} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: buttonBg, color: '#34C759', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '24px', border: `1px solid ${borderColor}` }}>+</div>
             <div title="Sunucuya Katıl" onClick={onJoinServerClick} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: buttonBg, color: '#007AFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '20px', border: `1px solid ${borderColor}` }}>🔗</div>

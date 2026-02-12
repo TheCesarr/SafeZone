@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { getUrl } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 
-export const useLobby = (authState, uuid, fetchServers) => {
+export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnreadDM) => {
     const lobbyWs = useRef(null);
     const [onlineUserIds, setOnlineUserIds] = useState([]);
     const [userStatuses, setUserStatuses] = useState({});
@@ -58,6 +58,14 @@ export const useLobby = (authState, uuid, fetchServers) => {
                         }]);
                     }
                     SoundManager.playMessage(); // Notification sound
+                    // Mark DM as unread if not currently viewing this conversation
+                    if (!selectedDM || selectedDM.username !== data.sender) {
+                        if (onUnreadDM) onUnreadDM(data.sender);
+                    }
+                } else if (data.type === 'friend_request') {
+                    // Friend request notification
+                    SoundManager.playMessage();
+                    if (onFriendRequest) onFriendRequest(data.sender, data.discriminator);
                 } else if (data.type === 'pong') {
                     setPing(Date.now() - data.timestamp);
                 }

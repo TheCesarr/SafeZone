@@ -8,23 +8,23 @@ export const STUN_SERVERS = {
 }
 
 // Helpers
+// Helpers
 export const getUrl = (endpoint, protocol = 'http') => {
     if (!endpoint) return '';
     if (endpoint.startsWith('http')) return endpoint;
 
-    // Decide base URL (Read from localStorage dynamic logic)
-    let base = localStorage.getItem('safezone_server_ip');
-    if (!base) return ''; // Do not default to localhost if no IP is set
+    // v2.0.0: Hardcoded Server IP
+    let base = "localhost:8000";
+    // TODO: Change this to your actual server IP provided by user later
 
-    const isTunnel = base.includes('loca.lt') || base.includes('ngrok') || base.includes('lhr.life') || base.includes('serveo.net') || base.includes('serveousercontent.com');
-    const port = isTunnel ? '' : ':8000';
-    base = base.replace(/https?:\/\//, '').replace(/\/$/, '');
+    // Check if secure
+    const isSecure = window.location.protocol === 'https:';
 
     if (protocol === 'ws') {
-        const proto = (isTunnel || window.location.protocol === 'https:') ? 'wss://' : 'ws://';
-        return `${proto}${base}${port}${endpoint}`;
+        const proto = isSecure ? 'wss://' : 'ws://';
+        return `${proto}${base}${endpoint}`;
     } else {
-        const proto = (isTunnel || window.location.protocol === 'https:') ? 'https://' : 'http://';
-        return `${proto}${base}${port}${endpoint}`;
+        const proto = isSecure ? 'https://' : 'http://';
+        return `${proto}${base}${endpoint}`;
     }
 }

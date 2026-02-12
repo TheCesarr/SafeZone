@@ -8,7 +8,7 @@ import os
 import datetime
 
 # Routers
-from routers import auth, server, channel, friends, chat, user
+from routers import auth, server, channel, friends, chat, user, admin
 
 # App Init
 app = FastAPI(title="SafeZone Backend", version="1.0.1")
@@ -35,6 +35,7 @@ app.include_router(channel.router)
 app.include_router(friends.router)
 app.include_router(chat.router)
 app.include_router(user.router)
+app.include_router(admin.router)
 
 @app.get("/")
 async def root():

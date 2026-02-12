@@ -4,16 +4,20 @@ from typing import Optional
 # --- AUTH ---
 class UserRegister(BaseModel):
     username: str
+    email: str
     password: str
     display_name: str
     recovery_pin: str = ""
 
 class UserLogin(BaseModel):
-    username: str
+    email: str
     password: str
+
+class AdminLogin(BaseModel):
+    secret: str
     
 class UserReset(BaseModel):
-    username: str
+    email: str
     recovery_pin: str
     new_password: str
 

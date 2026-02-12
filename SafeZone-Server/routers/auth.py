@@ -1,7 +1,8 @@
 from fastapi import APIRouter
-from models import UserRegister, UserLogin, UserReset
+from models import UserRegister, UserLogin, UserReset, AdminLogin
 from database import get_db_connection
 from utils import log_event
+from config import ADMIN_SECRET
 import bcrypt
 import secrets
 import sqlite3
@@ -12,9 +13,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register")
 async def register(user: UserRegister):
     try:
-        log_event("AUTH", f"Register attempt: {user.username}")
+        log_event("AUTH", f"Register attempt: {user.username} ({user.email})")
         conn = get_db_connection()
         c = conn.cursor()
+        
+        # Check if email exists
+        c.execute("SELECT id FROM users WHERE email = ?", (user.email,))
+        if c.fetchone():
+            conn.close()
+            return {"status": "error", "message": "Bu E-Posta adresi zaten kayıtlı."}
         
         # Generate discriminator (4-digit number)
         # Find all existing discriminators for this username
@@ -40,13 +47,17 @@ async def register(user: UserRegister):
         # Generate initial token
         token = secrets.token_hex(16)
         
-        c.execute("INSERT INTO users (username, password_hash, display_name, token, recovery_pin, discriminator) VALUES (?, ?, ?, ?, ?, ?)",
-                  (user.username, hashed_pw_str, user.display_name, token, user.recovery_pin, discriminator))
-        conn.commit()
+        try:
+            c.execute("INSERT INTO users (username, discriminator, email, password_hash, display_name, token, recovery_pin) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                      (user.username, discriminator, user.email, hashed_pw_str, user.display_name, token, user.recovery_pin))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.close()
+            return {"status": "error", "message": "Kayıt sırasında hata oluştu (Duplicate)."}
             
         conn.close()
         log_event("AUTH", f"User registered: {user.username}#{discriminator}")
-        return {"status": "success", "token": token, "username": user.username, "display_name": user.display_name, "discriminator": discriminator}
+        return {"status": "success", "token": token, "username": user.username, "display_name": user.display_name, "discriminator": discriminator, "email": user.email}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -59,18 +70,19 @@ async def login(user: UserLogin):
         conn = get_db_connection()
         c = conn.cursor()
         
-        c.execute("SELECT * FROM users WHERE username = ?", (user.username,))
+        # Login with Email
+        c.execute("SELECT * FROM users WHERE email = ?", (user.email,))
         db_user = c.fetchone()
         
         if not db_user:
             conn.close()
-            return {"status": "error", "message": "Kullanıcı adı veya şifre hatalı."}
+            return {"status": "error", "message": "E-Posta veya şifre hatalı."}
             
         # Verify password
         stored_hash = db_user['password_hash'].encode('utf-8')
         if not bcrypt.checkpw(user.password.encode('utf-8'), stored_hash):
             conn.close()
-            return {"status": "error", "message": "Kullanıcı adı veya şifre hatalı."}
+            return {"status": "error", "message": "E-Posta veya şifre hatalı."}
         
         # Generate new token
         new_token = secrets.token_hex(16)
@@ -78,11 +90,60 @@ async def login(user: UserLogin):
         conn.commit()
         conn.close()
         
-        return {"status": "success", "token": new_token, "username": db_user['username'], "display_name": db_user['display_name'], "discriminator": db_user['discriminator'] or '0001'}
+        return {
+            "status": "success", 
+            "token": new_token, 
+            "username": db_user['username'], 
+            "display_name": db_user['display_name'], 
+            "discriminator": db_user['discriminator'],
+            "email": db_user['email'],
+            "is_sysadmin": bool(db_user['is_sysadmin'])
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": f"Login Error: {str(e)}"}
+
+@router.post("/admin-login")
+async def admin_login(data: AdminLogin):
+    try:
+        # Check Master Key
+        if data.secret != ADMIN_SECRET:
+            return {"status": "error", "message": "Invalid Admin Secret"}
+            
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Find default ADMIN user (or any sysadmin)
+        c.execute("SELECT * FROM users WHERE is_sysadmin = 1 ORDER BY id ASC LIMIT 1")
+        admin_user = c.fetchone()
+        
+        if not admin_user:
+            conn.close()
+            return {"status": "error", "message": "No SysAdmin found in database."}
+            
+        # Generate new token
+        new_token = secrets.token_hex(16)
+        c.execute("UPDATE users SET token = ? WHERE id = ?", (new_token, admin_user['id']))
+        conn.commit()
+        conn.close()
+        
+        log_event("AUTH", f"Admin Auto-Login: {admin_user['username']}")
+        
+        return {
+            "status": "success", 
+            "token": new_token, 
+            "username": admin_user['username'], 
+            "display_name": admin_user['display_name'], 
+            "discriminator": admin_user['discriminator'],
+            "email": admin_user['email'],
+            "is_sysadmin": True
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": f"Admin Login Error: {str(e)}"}
 
 @router.post("/verify")
 async def verify_token(data: dict):
@@ -94,12 +155,19 @@ async def verify_token(data: dict):
             
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT username, display_name, discriminator FROM users WHERE token = ?", (token,))
+        c.execute("SELECT username, display_name, discriminator, email, is_sysadmin FROM users WHERE token = ?", (token,))
         user = c.fetchone()
         conn.close()
         
         if user:
-            return {"status": "success", "username": user['username'], "display_name": user['display_name'], "discriminator": user['discriminator'] or '0001'}
+            return {
+                "status": "success", 
+                "username": user['username'], 
+                "display_name": user['display_name'], 
+                "discriminator": user['discriminator'],
+                "email": user['email'],
+                "is_sysadmin": bool(user['is_sysadmin'])
+            }
         else:
             return {"status": "error", "message": "Invalid token"}
     except Exception as e:
@@ -113,7 +181,8 @@ async def reset_password(data: UserReset):
         conn = get_db_connection()
         c = conn.cursor()
         
-        c.execute("SELECT * FROM users WHERE username = ?", (data.username,))
+        # Find user by Email
+        c.execute("SELECT * FROM users WHERE email = ?", (data.email,))
         user = c.fetchone()
         
         if not user:
@@ -131,7 +200,7 @@ async def reset_password(data: UserReset):
         conn.commit()
         conn.close()
         
-        log_event("AUTH", f"Password reset for: {data.username}")
+        log_event("AUTH", f"Password reset for: {data.email}")
         return {"status": "success", "message": "Şifre başarıyla değiştirildi. Şimdi giriş yapabilirsin."}
         
     except Exception as e:

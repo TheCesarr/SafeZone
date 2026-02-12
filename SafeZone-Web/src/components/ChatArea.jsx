@@ -30,6 +30,15 @@ const ChatArea = ({
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    React.useEffect(() => {
+        scrollToBottom();
+    }, [currentMessages, typingUsers, attachment]); // Scroll on new messages, typing, or attachment preview
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
@@ -218,6 +227,7 @@ const ChatArea = ({
                         </div>
                     )
                 })}
+                <div ref={messagesEndRef} />
             </div>
 
             {/* Attachment Preview */}

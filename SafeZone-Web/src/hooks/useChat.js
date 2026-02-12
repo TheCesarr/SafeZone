@@ -4,7 +4,7 @@ import SoundManager from '../utils/SoundManager';
 import toast from '../utils/toast';
 
 // v2: Added connectToChannel and message handling
-export const useChat = (authState, uuid, chatWs, roomWs) => {
+export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState("");
     const [attachment, setAttachment] = useState(null);
@@ -33,6 +33,7 @@ export const useChat = (authState, uuid, chatWs, roomWs) => {
         if (msg.type === 'chat') {
             if (msg.sender !== authState.user.username) {
                 SoundManager.playMessage();
+                if (onUnreadMessage) onUnreadMessage();
             }
             setMessages(prev => [...prev, {
                 sender: msg.sender,

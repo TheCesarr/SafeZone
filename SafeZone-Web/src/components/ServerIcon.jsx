@@ -1,7 +1,7 @@
 import React from 'react';
 import { getUrl } from '../utils/api';
 
-const ServerIcon = ({ server, selected, onClick, onContextMenu }) => (
+const ServerIcon = ({ server, selected, onClick, onContextMenu, hasUnread }) => (
     <div
         onClick={onClick}
         onContextMenu={onContextMenu}
@@ -39,6 +39,7 @@ const ServerIcon = ({ server, selected, onClick, onContextMenu }) => (
         }}
     >
         {!server.icon && server.name.slice(0, 2).toUpperCase()}
+        {hasUnread && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ED4245', border: '3px solid #202225' }}></div>}
         {selected && <div style={{ position: 'absolute', left: '-13px', width: '8px', height: '40px', borderRadius: '0 4px 4px 0', backgroundColor: '#fff' }}></div>}
     </div>
 );

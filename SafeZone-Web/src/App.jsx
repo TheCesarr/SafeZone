@@ -15,6 +15,7 @@ import { getTheme, getPaletteName } from './utils/themes';
 import StreamOverlay from './components/StreamOverlay';
 import MemberList from './components/MemberList';
 import { useToast } from './hooks/useToast';
+import { useUnread } from './hooks/useUnread';
 import ToastContainer from './components/common/Toast';
 
 // NEW HOOKS
@@ -24,17 +25,18 @@ import { useWebRTC } from './hooks/useWebRTC';
 import { useChat } from './hooks/useChat';
 import { useLobby } from './hooks/useLobby';
 
+import AdminDashboard from './components/AdminDashboard'; // Import AdminDashboard
+
 function App() {
   // --- 1. CONFIG & AUTH ---
-  const [serverIp, setServerIp] = useState(localStorage.getItem('safezone_server_ip') || window.location.hostname || 'localhost')
-  const [isServerSet, setIsServerSet] = useState(!!localStorage.getItem('safezone_server_ip'))
+  // v2.0.0: Server IP is hardcoded in api.js, no state needed here.
 
   // Toast Hook
   const { toasts, showToast, removeToast } = useToast();
 
   // Auth Hook
-  const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, isLoading: authLoading } = useAuth();
-  const [authInput, setAuthInput] = useState({ username: '', password: '', display_name: '', recovery_pin: '' });
+  const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, handleAdminLogin, isLoading: authLoading } = useAuth();
+  const [authInput, setAuthInput] = useState({ email: '', username: '', password: '', display_name: '', recovery_pin: '' });
 
   // Refs (used by multiple hooks)
   const uuid = useRef(localStorage.getItem('safezone_uuid') || uuidv4())
@@ -57,15 +59,28 @@ function App() {
 
   // --- 2. LOGIC HOOKS ---
   const serverData = useServerData(authState);
+  const unread = useUnread();
 
-  const lobby = useLobby(authState, uuid, serverData.fetchServers); // Pass fetchServers to lobby for updates
+  // Admin View State
+  const [adminView, setAdminView] = useState(true);
+
+  const lobby = useLobby(authState, uuid, serverData.fetchServers, (sender, disc) => {
+    showToast(`${sender}#${disc} sana arkadaşlık isteği gönderdi!`, 'info');
+    serverData.fetchFriends();
+  }, (sender) => {
+    unread.markDMUnread(sender);
+  });
 
   // Chat & Voice Hooks (Interconnected)
-  const chat = useChat(authState, uuid, chatWs, roomWs);
+  const chat = useChat(authState, uuid, chatWs, roomWs, () => {
+    // onUnreadMessage logic...
+  });
   const webrtc = useWebRTC(authState, uuid, roomWs, chat.handleIncomingMessage, selectedInputId, selectedOutputId, audioSettings);
 
   // --- 3. UI STATE (Specific to App Layout) ---
   const [showCreateServer, setShowCreateServer] = useState(false)
+
+  // ... (keeping other states)
   const [showJoinServer, setShowJoinServer] = useState(false)
   const [modalInput, setModalInput] = useState("")
 
@@ -112,6 +127,27 @@ function App() {
 
   // --- 4. EFFECTS & HELPERS ---
 
+  // Admin Auto-Login
+  useEffect(() => {
+    const checkAdmin = async () => {
+      // Check if Electron API is available
+      if (window.SAFEZONE_API) {
+        const type = await window.SAFEZONE_API.getBuildType();
+        if (type === 'admin') {
+          // If we are already logged in as sysadmin, no need to auto-login, 
+          // but we might want to ensure we have the view set to true initially.
+          if (!authState.token) {
+            const secret = await window.SAFEZONE_API.getAdminSecret();
+            if (secret) {
+              handleAdminLogin(secret);
+            }
+          }
+        }
+      }
+    };
+    checkAdmin();
+  }, [authState.token]);
+
   // Theme Background
   useEffect(() => {
     document.body.style.backgroundColor = colors.background;
@@ -121,7 +157,7 @@ function App() {
   // Auth Sync
   useEffect(() => {
     if (authState.token) {
-      setIsServerSet(true);
+      // setIsServerSet(true); // No longer needed
       // Hooks handle data fetching automatically on token change
     }
   }, [authState.token]);
@@ -130,31 +166,19 @@ function App() {
   useEffect(() => {
     const getDevices = async () => {
       try {
-        // Request permission primarily to get labels
-        // We only request if we are going to join a voice channel or if user is in settings, 
-        // but for simplicity we can try to enumerate. 
-        // Without permission, labels might be empty.
         const devices = await navigator.mediaDevices.enumerateDevices();
-
         const inputs = devices.filter(d => d.kind === 'audioinput');
         const outputs = devices.filter(d => d.kind === 'audiooutput');
-
         setInputDevices(inputs);
         setOutputDevices(outputs);
-
-        // Set defaults if not set
         if (selectedInputId === 'default' && inputs.length > 0 && !inputs.find(d => d.deviceId === 'default')) {
           setSelectedInputId(inputs[0].deviceId);
         }
         if (selectedOutputId === 'default' && outputs.length > 0 && !outputs.find(d => d.deviceId === 'default')) {
           setSelectedOutputId(outputs[0].deviceId);
         }
-
-      } catch (e) {
-        console.error("Error enumerating devices:", e);
-      }
+      } catch (e) { console.error("Error enumerating devices:", e); }
     };
-
     getDevices();
     navigator.mediaDevices.addEventListener('devicechange', getDevices);
     return () => navigator.mediaDevices.removeEventListener('devicechange', getDevices);
@@ -175,22 +199,14 @@ function App() {
 
   // Wrappers for UI Actions
   const handleAuthSubmit = () => {
-    if (authMode === 'login') handleLogin(authInput.username, authInput.password);
-    else if (authMode === 'register') handleRegister(authInput.username, authInput.password, authInput.display_name, authInput.recovery_pin);
-    else if (authMode === 'reset') handleResetPassword(authInput.username, authInput.recovery_pin, authInput.password);
-    // Reset logic handled in hook? No, added simplified.
+    if (authMode === 'login') handleLogin(authInput.email, authInput.password);
+    else if (authMode === 'register') handleRegister(authInput.username, authInput.email, authInput.password, authInput.display_name, authInput.recovery_pin);
+    else if (authMode === 'reset') handleResetPassword(authInput.email, authInput.recovery_pin, authInput.password);
   }
 
   const doLogout = () => {
     webrtc.disconnectVoice();
     hookLogout();
-  }
-
-  const saveServerIp = () => {
-    if (!serverIp) return;
-    localStorage.setItem('safezone_server_ip', serverIp);
-    setIsServerSet(true);
-    window.location.reload(); // Simple reload to re-init hooks with new IP if needed
   }
 
   // Handle Create/Join Server
@@ -231,33 +247,44 @@ function App() {
 
 
   // --- 5. RENDER (The big block) ---
-  if (!isServerSet) {
+  // If SysAdmin and in Admin View, show Dashboard
+  if (authState.user?.is_sysadmin && adminView) {
     return (
-      <div style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2670&auto=format&fit=crop")', backgroundSize: 'cover', backgroundPosition: 'center', height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Inter", sans-serif' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(5px)' }}></div>
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '48px', fontWeight: '900', color: '#fff', marginBottom: '30px', textShadow: '0 0 20px rgba(88, 101, 242, 0.8)' }}>SafeZone</h1>
-          <div style={{ width: '480px', padding: '32px', background: colors.card, borderRadius: '5px', boxShadow: '0 2px 10px 0 rgba(0,0,0,0.2)', textAlign: 'center' }}>
-            <h2 style={{ color: colors.text, marginBottom: '8px', fontSize: '24px', fontWeight: 'bold' }}>Sunucuya Bağlan</h2>
-            <input type="text" value={serverIp} onChange={e => setServerIp(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '3px', border: '1px solid #333', background: colors.sidebar, color: colors.text }} />
-            <button onClick={saveServerIp} style={{ width: '100%', padding: '10px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer' }}>Bağlan</button>
-          </div>
-        </div>
-      </div>
+      <AdminDashboard
+        authState={authState}
+        onLogout={doLogout}
+        colors={colors}
+        onJoinServer={(server) => {
+          // Logic to join server from Dashboard
+          // Assuming server object has ID
+          // Check if we are already member?
+          // For now, let's just switch view and try to select.
+          // If not member, we might need a specific 'join' call for admin.
+          setAdminView(false);
+          if (server) serverData.selectServer(server);
+        }}
+      />
     )
   }
 
   if (!authState.token) {
     return (
       <div style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2670&auto=format&fit=crop")', backgroundSize: 'cover', backgroundPosition: 'center', height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Inter", sans-serif' }}>
-        <div style={{ width: '480px', padding: '32px', background: colors.card, borderRadius: '5px' }}>
-          <h2 style={{ color: colors.text, marginBottom: '20px' }}>{authMode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</h2>
-          {authError && <div style={{ color: colors.error, marginBottom: 10 }}>{authError}</div>}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)' }}></div>
+        <div style={{ width: '480px', padding: '32px', background: colors.card, borderRadius: '5px', zIndex: 1, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+          <h2 style={{ color: colors.text, marginBottom: '20px', textAlign: 'center', fontSize: '28px' }}>SafeZone v2.0</h2>
+
+          <h3 style={{ color: '#b9bbbe', marginBottom: '20px', textAlign: 'center', fontSize: '18px' }}>
+            {authMode === 'login' ? 'Giriş Yap' : authMode === 'register' ? 'Hesap Oluştur' : 'Şifre Sıfırla'}
+          </h3>
+
+          {authError && <div style={{ color: '#ed4245', marginBottom: 15, padding: '10px', background: 'rgba(237, 66, 69, 0.1)', borderRadius: '3px', border: '1px solid #ed4245' }}>{authError}</div>}
+
           {authMode === 'reset' && (
             <>
               <div style={{ marginBottom: 15 }}>
-                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KULLANICI ADI</label>
-                <input type="text" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>E-POSTA</label>
+                <input type="email" value={authInput.email} onChange={e => setAuthInput({ ...authInput, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
               </div>
               <div style={{ marginBottom: 15 }}>
                 <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KURTARMA PIN (4 Haneli)</label>
@@ -270,11 +297,11 @@ function App() {
             </>
           )}
 
-          {authMode !== 'reset' && (
+          {authMode === 'login' && (
             <>
               <div style={{ marginBottom: 15 }}>
-                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KULLANICI ADI</label>
-                <input type="text" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>E-POSTA</label>
+                <input type="email" value={authInput.email} onChange={e => setAuthInput({ ...authInput, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>ŞİFRE</label>
@@ -286,36 +313,44 @@ function App() {
           {authMode === 'register' && (
             <>
               <div style={{ marginBottom: 15 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>E-POSTA (*)</label>
+                <input type="email" value={authInput.email} onChange={e => setAuthInput({ ...authInput, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+              <div style={{ marginBottom: 15 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KULLANICI ADI (*)</label>
+                <input type="text" value={authInput.username} onChange={e => setAuthInput({ ...authInput, username: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
+              <div style={{ marginBottom: 15 }}>
                 <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>GÖRÜNEN İSİM</label>
                 <input type="text" value={authInput.display_name} onChange={e => setAuthInput({ ...authInput, display_name: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
               </div>
+              <div style={{ marginBottom: 15 }}>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>ŞİFRE (*)</label>
+                <input type="password" value={authInput.password} onChange={e => setAuthInput({ ...authInput, password: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
+              </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>PIN (4 Haneli)</label>
+                <label style={{ display: 'block', color: '#b9bbbe', fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>KURTARMA PIN (4 Haneli - Şifre Sıfırlama İçin)</label>
                 <input type="text" maxLength="4" value={authInput.recovery_pin} onChange={e => setAuthInput({ ...authInput, recovery_pin: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 3, border: '1px solid #202225', background: '#202225', color: '#fff' }} />
               </div>
             </>
           )}
 
-          <button onClick={handleAuthSubmit} style={{ width: '100%', padding: 10, background: colors.accent, color: '#fff', border: 'none', borderRadius: 3, fontWeight: 'bold', cursor: 'pointer' }}>
-            {authMode === 'login' ? 'Giriş' : authMode === 'register' ? 'Kayıt Ol' : 'Şifreyi Sıfırla'}
+          <button onClick={handleAuthSubmit} style={{ width: '100%', padding: 10, background: colors.accent, color: '#fff', border: 'none', borderRadius: 3, fontWeight: 'bold', cursor: 'pointer', transition: 'filter 0.2s', marginTop: '10px' }} onMouseOver={(e) => e.target.style.filter = 'brightness(1.1)'} onMouseOut={(e) => e.target.style.filter = 'brightness(1)'}>
+            {authMode === 'login' ? 'Giriş Yap' : authMode === 'register' ? 'Kayıt Ol' : 'Şifreyi Sıfırla'}
           </button>
-          <div style={{ marginTop: 10, fontSize: 14, color: '#72767d' }}>
+
+          <div style={{ marginTop: 20, fontSize: 14, color: '#72767d', textAlign: 'center' }}>
             {authMode === 'login' ?
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-                  <span style={{ fontSize: 14, color: '#72767d' }}>Hesabın yok mu? <span onClick={() => setAuthMode('register')} style={{ color: colors.accent, cursor: 'pointer' }}>Kaydol</span></span>
-                  <span onClick={() => setAuthMode('reset')} style={{ fontSize: 14, color: colors.accent, cursor: 'pointer' }}>Şifremi Unuttum</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <span>Hesabın yok mu? <span onClick={() => setAuthMode('register')} style={{ color: colors.accent, cursor: 'pointer', fontWeight: 'bold' }}>Kaydol</span></span>
+                  <span onClick={() => setAuthMode('reset')} style={{ fontSize: 12, color: colors.accent, cursor: 'pointer' }}>Şifremi Unuttum</span>
                 </div>
               </> :
               authMode === 'register' ?
-                <>Zaten hesabın var mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer' }}>Giriş Yap</span></> :
-                <>Hatırladın mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer' }}>Giriş Yap</span></>
+                <>Zaten hesabın var mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer', fontWeight: 'bold' }}>Giriş Yap</span></> :
+                <>Hatırladın mı? <span onClick={() => setAuthMode('login')} style={{ color: colors.accent, cursor: 'pointer', fontWeight: 'bold' }}>Giriş Yap</span></>
             }
-          </div>
-          <div style={{ marginTop: 20, textAlign: 'center', borderTop: '1px solid #2f3136', paddingTop: 10 }}>
-            <span onClick={() => setIsServerSet(false)} style={{ fontSize: 12, color: '#72767d', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-              ⚙️ Sunucu Ayarları
-            </span>
           </div>
         </div>
       </div>
@@ -330,6 +365,9 @@ function App() {
         myServers={serverData.myServers}
         selectedServer={serverData.selectedServer}
         showFriendsList={showFriendsList}
+        unreadChannels={unread.unreadChannels}
+        unreadDMs={unread.unreadDMs}
+        friendRequestsCount={serverData.friendRequests.incoming.length}
         onServerClick={(s) => { serverData.selectServer(s); setShowFriendsList(false); lobby.setSelectedDM(null); }}
         onFriendsClick={() => { setShowFriendsList(true); serverData.selectServer(null); lobby.setSelectedDM(null); }}
         onCreateServerClick={() => setShowCreateServer(true)}
@@ -337,6 +375,8 @@ function App() {
         onSettingsClick={() => setShowSettings(true)}
         handleServerRightClick={handleServerRightClick}
         colors={colors}
+        isSysAdmin={authState.user?.is_sysadmin}
+        onAdminClick={() => setAdminView(true)}
       />
 
       {/* CHANNEL / FRIENDS LIST */}
@@ -349,13 +389,9 @@ function App() {
         onlineUserIds={lobby.onlineUserIds}
         userStatuses={lobby.userStatuses}
         handleRespondRequest={(username, action) => {
-          const req = serverData.friendRequests.incoming.find(r => r.username === username);
-          if (req) {
-            serverData.respondFriendRequest(req.id, action);
-          }
+          serverData.respondFriendRequest(username, action);
         }}
         setShowAddFriend={setShowAddFriend}
-        handleStartDM={lobby.startDM}
         handleRemoveFriend={(username) => {
           const f = serverData.friends.find(fr => fr.username === username);
           if (f) serverData.removeFriend(f.id);
@@ -363,7 +399,19 @@ function App() {
         selectedServer={serverData.selectedServer}
         serverMembers={serverData.serverMembers}
         setShowChannelCreateModal={setShowChannelCreateModal}
-        handleChannelClick={(ch) => serverData.setSelectedChannel(ch)} // Effect handles connection
+        // UNREAD PROPS
+        unreadChannels={unread.unreadChannels}
+        unreadDMs={unread.unreadDMs}
+
+        // HANDLERS
+        handleChannelClick={(ch) => {
+          serverData.setSelectedChannel(ch);
+          unread.markChannelRead(ch.id);
+        }}
+        handleStartDM={(friend) => {
+          lobby.startDM(friend);
+          unread.markDMRead(friend.username);
+        }}
         setContextMenu={setContextMenu}
         selectedChannel={serverData.selectedChannel}
         activeVoiceChannel={webrtc.activeVoiceChannel}
@@ -437,6 +485,7 @@ function App() {
                   colors={colors}
                   width={memberListWidth}
                   onResizeStart={handleResizeStart}
+                  handleUserContextMenu={handleUserContextMenu}
                 />
               )}
             </>
