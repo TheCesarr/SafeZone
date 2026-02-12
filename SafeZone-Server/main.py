@@ -27,6 +27,8 @@ app.add_middleware(
 
 # Init Database
 init_db()
+from database import init_admin
+init_admin()
 
 # Include Routers
 app.include_router(auth.router)
