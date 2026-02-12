@@ -16,16 +16,18 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
 
     // Connect
     const connectToLobby = () => {
-        if (!authState.token || !uuid.current) return;
+        if (!authState.token || !authState.user?.username) return;
 
         if (lobbyWs.current) lobbyWs.current.close();
-        const wsUrl = getUrl(`/ws/lobby/${uuid.current}`, 'ws');
+        // Use username for Lobby ID so backend updates the correct user row
+        const wsUrl = getUrl(`/ws/lobby/${authState.user.username}`, 'ws');
         lobbyWs.current = new WebSocket(wsUrl);
 
         lobbyWs.current.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'lobby_update') {
+                    console.log("[useLobby] Update:", data);
                     setTotalUsers(data.total_online);
                     setRoomDetails(data.room_details || {});
 

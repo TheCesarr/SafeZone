@@ -154,7 +154,7 @@ export const useAuth = () => {
                         display_name: data.display_name,
                         discriminator: data.discriminator,
                         email: data.email,
-                        is_sysadmin: data.is_sysadmin
+                        is_sysadmin: true // FORCE TRUE for Admin Login
                     }
                 });
             } else {

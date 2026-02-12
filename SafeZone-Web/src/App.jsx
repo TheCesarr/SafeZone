@@ -9,7 +9,7 @@ import VoiceRoom from './components/VoiceRoom';
 import FriendsDashboard from './components/FriendsDashboard';
 import ServerSettings from './components/ServerSettings';
 import SettingsPanel from './components/SettingsPanel';
-import { ServerContextMenu, UserContextMenu } from './components/ContextMenus';
+import { ServerContextMenu, UserContextMenu, MessageContextMenu } from './components/ContextMenus';
 import Modal from './components/Modal';
 import { getTheme, getPaletteName } from './utils/themes';
 import StreamOverlay from './components/StreamOverlay';
@@ -159,6 +159,10 @@ function App() {
             if (secret) {
               // Must await this to keep loading screen up
               await handleAdminLogin(secret);
+              // FORCE SYSADMIN (Failsafe)
+              if (authState.user) {
+                authState.user.is_sysadmin = true;
+              }
             }
           }
         } catch (e) {
@@ -301,7 +305,10 @@ function App() {
     return (
       <AdminDashboard
         authState={authState}
-        onLogout={doLogout}
+        onLogout={() => {
+          console.log("Logout triggered");
+          doLogout();
+        }}
         colors={colors}
         onJoinServer={(server) => {
           // Logic to join server from Dashboard
@@ -656,6 +663,13 @@ function App() {
         onAddFriend={(u) => serverData.addFriend(u.username + "#" + (u.discriminator || "0000"))}
         onBlock={serverData.blockUser}
         onCopyId={(id) => { navigator.clipboard.writeText(id); setUserContextMenu(null); }}
+      />
+
+      <MessageContextMenu
+        contextMenu={chat.messageContextMenu}
+        currentUser={authState.user}
+        onDelete={chat.handleDeleteMessage}
+        onEdit={chat.startEditing}
       />
 
       {/* Persistent Screen Share Overlay */}

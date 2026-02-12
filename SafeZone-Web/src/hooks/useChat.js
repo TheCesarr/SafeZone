@@ -5,6 +5,12 @@ import toast from '../utils/toast';
 
 // v2: Added connectToChannel and message handling
 export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
+    // DEBUG AUTH
+    useEffect(() => {
+        console.log("[useChat] AuthState Updated:", authState);
+        console.log("[useChat] is_sysadmin:", authState.user?.is_sysadmin);
+    }, [authState]);
+
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState("");
     const [attachment, setAttachment] = useState(null);
@@ -68,6 +74,8 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
                 return newSet;
             });
+        } else if (msg.type === 'message_deleted') {
+            setMessages(prev => prev.filter(m => m.id !== msg.message_id));
         }
     }
 
@@ -144,7 +152,16 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
     // --- EDIT / DELETE ---
     const handleMessageContextMenu = (e, msg) => {
-        if (msg.sender !== authState.user.username && !authState.user.is_sysadmin) return;
+        console.log("[useChat] Context Menu Check:", {
+            sender: msg.sender,
+            me: authState.user.username,
+            isAdmin: authState.user.is_sysadmin
+        });
+
+        if (msg.sender !== authState.user.username && !authState.user.is_sysadmin) {
+            console.log("[useChat] Context Menu BLOCKED");
+            return;
+        }
         e.preventDefault();
         setMessageContextMenu({ x: e.pageX, y: e.pageY, msg });
     }

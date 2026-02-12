@@ -31,3 +31,26 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId })
         </div>
     );
 };
+
+export const MessageContextMenu = ({ contextMenu, onDelete, onEdit }) => {
+    if (!contextMenu) return null;
+    const isMe = contextMenu.msg.sender === contextMenu.currentUser?.username;
+    // Allow if ME or SYSADMIN
+    const canEdit = isMe || contextMenu.currentUser?.is_sysadmin;
+
+    return (
+        <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '4px', padding: '5px', zIndex: 20000, minWidth: '120px' }}>
+            {canEdit && (
+                <div onClick={() => onEdit(contextMenu.msg)} style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' } }}>
+                    ✏️ Düzenle
+                </div>
+            )}
+            <div onClick={() => onDelete(contextMenu.msg)} style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#f04747', color: '#fff' } }}>
+                🗑️ Sil
+            </div>
+            <div style={{ fontSize: '10px', color: '#555', padding: '4px 12px', borderTop: '1px solid #222', marginTop: '4px' }}>
+                ID: {contextMenu.msg.id}
+            </div>
+        </div>
+    );
+};
