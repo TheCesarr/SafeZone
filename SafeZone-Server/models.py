@@ -69,3 +69,15 @@ class DMSend(BaseModel):
     token: str
     receiver_username: str
     content: str
+
+# --- ADMIN UPDATES ---
+class AdminUserUpdate(BaseModel):
+    username: Optional[str] = None
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    is_sysadmin: Optional[bool] = None
+
+class AdminServerUpdate(BaseModel):
+    name: Optional[str] = None
+    owner_id: Optional[int] = None

@@ -14,6 +14,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const [messageContextMenu, setMessageContextMenu] = useState(null);
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editText, setEditText] = useState("");
+    const typingTimeouts = useRef({});
 
     // --- CONNECTION ---
     const connectToChannel = (channel) => {
@@ -46,17 +47,25 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         } else if (msg.type === 'history') {
             setMessages(msg.messages || []);
         } else if (msg.type === 'typing') {
-            // Simplified typing logic
             setTypingUsers(prev => {
                 const newSet = new Set(prev);
                 newSet.add(msg.sender);
-                setTimeout(() => {
+
+                // Clear existing timeout for this user
+                if (typingTimeouts.current[msg.sender]) {
+                    clearTimeout(typingTimeouts.current[msg.sender]);
+                }
+
+                // Set new timeout
+                typingTimeouts.current[msg.sender] = setTimeout(() => {
                     setTypingUsers(current => {
                         const updated = new Set(current);
                         updated.delete(msg.sender);
                         return updated;
-                    })
+                    });
+                    delete typingTimeouts.current[msg.sender];
                 }, 3000);
+
                 return newSet;
             });
         }
@@ -135,7 +144,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
     // --- EDIT / DELETE ---
     const handleMessageContextMenu = (e, msg) => {
-        if (msg.sender !== authState.user.username) return;
+        if (msg.sender !== authState.user.username && !authState.user.is_sysadmin) return;
         e.preventDefault();
         setMessageContextMenu({ x: e.pageX, y: e.pageY, msg });
     }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 
-const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
+const AdminDashboard = ({ authState, onLogout, colors, onJoinServer, onSwitchToClient }) => {
     const [activeTab, setActiveTab] = useState('overview'); // overview, users, servers
     const [stats, setStats] = useState({ users: '-', servers: '-', total_servers: '-' });
     const [users, setUsers] = useState([]);
@@ -73,6 +73,59 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
             fetchStats();
         }
     }
+
+    // --- MODAL STATE & HANDLERS ---
+    const [editingUser, setEditingUser] = useState(null);
+    const [editingServer, setEditingServer] = useState(null);
+    const [editForm, setEditForm] = useState({});
+
+    const openEditUser = (user) => {
+        setEditForm({
+            username: user.username,
+            display_name: user.display_name,
+            email: user.email,
+            is_sysadmin: !!user.is_sysadmin,
+            password: ""
+        });
+        setEditingUser(user);
+    };
+
+    const openEditServer = (server) => {
+        setEditForm({
+            name: server.name,
+            owner_id: server.owner_id
+        });
+        setEditingServer(server);
+    };
+
+    const closeModals = () => {
+        setEditingUser(null);
+        setEditingServer(null);
+        setEditForm({});
+    };
+
+    const handleSaveUser = async () => {
+        if (!editingUser) return;
+        const body = { ...editForm };
+        if (!body.password) delete body.password; // Don't send empty password
+
+        const res = await fetchAPI(`/admin/user/${editingUser.id}`, 'PUT', body);
+        if (res) {
+            showToast(res.message, 'success');
+            fetchUsers();
+            closeModals();
+        }
+    };
+
+    const handleSaveServer = async () => {
+        if (!editingServer) return;
+        const res = await fetchAPI(`/admin/server/${editingServer.id}`, 'PUT', editForm);
+        if (res) {
+            showToast(res.message, 'success');
+            fetchServers();
+            closeModals();
+        }
+    };
 
     useEffect(() => {
         if (activeTab === 'overview') fetchStats();
@@ -155,7 +208,7 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
                                                 }
                                             </td>
                                             <td style={tableCellStyle}>
-                                                <button style={{ ...buttonStyle, background: 'rgba(255,255,255,0.1)', fontSize: 12 }} disabled>Düzenle</button>
+                                                <button onClick={() => openEditUser(u)} style={{ ...buttonStyle, background: '#4f545c', fontSize: 12 }}>Düzenle</button>
                                             </td>
                                         </tr>
                                     ))}
@@ -184,7 +237,7 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
                                         const isDeleted = !!s.deleted_at;
                                         return (
                                             <tr key={s.id} style={{ opacity: isDeleted ? 0.6 : 1 }}>
-                                                <td style={tableCellStyle}>{s.id.substring(0, 8)}...</td>
+                                                <td style={tableCellStyle}>{s.id}</td>
                                                 <td style={tableCellStyle}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                                         <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#3BA55C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -202,6 +255,13 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
                                                 </td>
                                                 <td style={tableCellStyle}>
                                                     <div style={{ display: 'flex', gap: 10 }}>
+                                                        <button
+                                                            onClick={() => openEditServer(s)}
+                                                            style={{ ...buttonStyle, background: '#4f545c' }}
+                                                            title="Düzenle"
+                                                        >
+                                                            ✏️
+                                                        </button>
                                                         <button
                                                             onClick={() => handleJoinClick(s.id)}
                                                             style={{ ...buttonStyle, background: '#5865F2' }}
@@ -258,6 +318,9 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
                             <div style={{ fontSize: 10, color: '#b9bbbe' }}>System Admin</div>
                         </div>
                     </div>
+                    {onSwitchToClient && (
+                        <button onClick={onSwitchToClient} style={{ width: '100%', padding: 10, marginBottom: 10, background: '#5865F2', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>Client UI Geç</button>
+                    )}
                     <button onClick={onLogout} style={{ width: '100%', padding: 10, background: '#ed4245', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>Çıkış Yap</button>
                 </div>
             </div>
@@ -266,6 +329,62 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer }) => {
             <div style={{ flex: 1, overflowY: 'auto', background: '#36393f' }}>
                 {renderContent()}
             </div>
+
+            {/* EDIT USER MODAL */}
+            {editingUser && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: '#36393f', padding: 20, borderRadius: 8, width: 400 }}>
+                        <h3 style={{ marginBottom: 20 }}>Kullanıcı Düzenle</h3>
+                        <div style={{ marginBottom: 15 }}>
+                            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: '#b9bbbe' }}>Kullanıcı Adı</label>
+                            <input maxLength="16" value={editForm.username || ''} onChange={e => setEditForm({ ...editForm, username: e.target.value })} style={{ width: '100%', padding: 10, background: '#202225', border: 'none', color: '#fff', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ marginBottom: 15 }}>
+                            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: '#b9bbbe' }}>Görünen İsim</label>
+                            <input maxLength="16" value={editForm.display_name || ''} onChange={e => setEditForm({ ...editForm, display_name: e.target.value })} style={{ width: '100%', padding: 10, background: '#202225', border: 'none', color: '#fff', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ marginBottom: 15 }}>
+                            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: '#b9bbbe' }}>E-Posta</label>
+                            <input value={editForm.email || ''} onChange={e => setEditForm({ ...editForm, email: e.target.value })} style={{ width: '100%', padding: 10, background: '#202225', border: 'none', color: '#fff', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ marginBottom: 15 }}>
+                            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: '#b9bbbe' }}>Şifre (Değiştirmek için doldur)</label>
+                            <input type="password" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} style={{ width: '100%', padding: 10, background: '#202225', border: 'none', color: '#fff', borderRadius: 4 }} placeholder="Boş bırakırsan değişmez" />
+                        </div>
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', color: '#fff', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={editForm.is_sysadmin || false} onChange={e => setEditForm({ ...editForm, is_sysadmin: e.target.checked })} style={{ marginRight: 10 }} />
+                                System Admin Yetkisi
+                            </label>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                            <button onClick={closeModals} style={{ padding: '10px 20px', background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer' }}>İptal</button>
+                            <button onClick={handleSaveUser} style={{ padding: '10px 20px', background: '#3BA55C', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT SERVER MODAL */}
+            {editingServer && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: '#36393f', padding: 20, borderRadius: 8, width: 400 }}>
+                        <h3 style={{ marginBottom: 20 }}>Sunucu Düzenle</h3>
+                        <div style={{ marginBottom: 15 }}>
+                            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: '#b9bbbe' }}>Sunucu Adı</label>
+                            <input maxLength="16" value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} style={{ width: '100%', padding: 10, background: '#202225', border: 'none', color: '#fff', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: '#b9bbbe' }}>Sahip ID (Owner ID)</label>
+                            <input type="number" value={editForm.owner_id || ''} onChange={e => setEditForm({ ...editForm, owner_id: parseInt(e.target.value) })} style={{ width: '100%', padding: 10, background: '#202225', border: 'none', color: '#fff', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                            <button onClick={closeModals} style={{ padding: '10px 20px', background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer' }}>İptal</button>
+                            <button onClick={handleSaveServer} style={{ padding: '10px 20px', background: '#3BA55C', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -127,6 +127,18 @@ function App() {
 
   // --- 4. EFFECTS & HELPERS ---
 
+  // Build Type State
+  const [buildType, setBuildType] = useState('client');
+
+  // Fetch Build Type on Mount
+  useEffect(() => {
+    if (window.SAFEZONE_API) {
+      window.SAFEZONE_API.getBuildType().then(type => {
+        setBuildType(type);
+      });
+    }
+  }, []);
+
   // Admin Auto-Login
   // Admin Auto-Login Logic
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
@@ -139,7 +151,7 @@ function App() {
           await new Promise(r => setTimeout(r, 500));
 
           const type = await window.SAFEZONE_API.getBuildType();
-          console.log('Build Type:', type);
+          // console.log('Build Type:', type); // Already fetched above
 
           if (type === 'admin') {
             const secret = await window.SAFEZONE_API.getAdminSecret();
@@ -284,8 +296,8 @@ function App() {
     );
   }
 
-  // If SysAdmin and in Admin View, show Dashboard
-  if (authState.user?.is_sysadmin && adminView) {
+  // If SysAdmin and in Admin View AND Build Type is Admin, show Dashboard
+  if (authState.user?.is_sysadmin && adminView && buildType === 'admin') {
     return (
       <AdminDashboard
         authState={authState}
@@ -300,6 +312,7 @@ function App() {
           setAdminView(false);
           if (server) serverData.selectServer(server);
         }}
+        onSwitchToClient={() => setAdminView(false)}
       />
     )
   }
@@ -412,7 +425,7 @@ function App() {
         onSettingsClick={() => setShowSettings(true)}
         handleServerRightClick={handleServerRightClick}
         colors={colors}
-        isSysAdmin={authState.user?.is_sysadmin}
+        isSysAdmin={authState.user?.is_sysadmin && buildType === 'admin'}
         onAdminClick={() => setAdminView(true)}
       />
 

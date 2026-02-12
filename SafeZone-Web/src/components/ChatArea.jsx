@@ -315,7 +315,13 @@ const ChatArea = ({
                         placeholder={`Mesaj gönder: ${selectedDM ? '@' + selectedDM.username : (selectedChannel ? '#' + selectedChannel.name : '')}`}
                         value={inputText}
                         onChange={handleTyping}
-                        onKeyDown={e => e.key === 'Enter' && (selectedDM ? onSendDM() : onSendMessage())}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (selectedDM) onSendDM();
+                                else onSendMessage();
+                            }
+                        }}
                         style={{ color: colors?.text || '#fff' }}
                     />
                 </div>

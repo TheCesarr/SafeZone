@@ -17,14 +17,10 @@ export const getUrl = (endpoint, protocol = 'http') => {
     let base = "31.57.156.201:8000";
     // TODO: Change this to your actual server IP provided by user later
 
-    // Check if secure
-    const isSecure = window.location.protocol === 'https:';
-
+    // v2.0.0: Server is HTTP (Not HTTPS) -> Force insecure
     if (protocol === 'ws') {
-        const proto = isSecure ? 'wss://' : 'ws://';
-        return `${proto}${base}${endpoint}`;
+        return `ws://${base}${endpoint}`;
     } else {
-        const proto = isSecure ? 'https://' : 'http://';
-        return `${proto}${base}${endpoint}`;
+        return `http://${base}${endpoint}`;
     }
 }

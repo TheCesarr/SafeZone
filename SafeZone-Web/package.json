@@ -1,7 +1,7 @@
 {
   "name": "safezone-web",
   "private": true,
-  "version": "1.6.5",
+  "version": "1.6.10",
   "main": "electron/main.cjs",
   "type": "module",
   "description": "SafeZone - Secure Voice Chat",

@@ -63,6 +63,13 @@ def check_permission(user_id: int, server_id: str, permission: int) -> bool:
     try:
         conn = get_db_connection()
         c = conn.cursor()
+
+        # 0. Check if user is SysAdmin (Global Override)
+        c.execute("SELECT is_sysadmin FROM users WHERE id = ?", (user_id,))
+        user_row = c.fetchone()
+        if user_row and user_row['is_sysadmin']:
+            conn.close()
+            return True
         
         # 1. Check if user is server owner (always has all perms)
         c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))

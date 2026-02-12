@@ -14,7 +14,9 @@ const ServerSidebar = ({
     colors,
     unreadChannels,
     unreadDMs,
-    friendRequestsCount
+    friendRequestsCount,
+    isSysAdmin,
+    onAdminClick
 }) => {
     // Dynamic Styles
     const sidebarBg = colors?.sidebar || 'rgba(10, 10, 15, 0.6)';

@@ -109,3 +109,106 @@ def delete_server(server_id: str, admin = Depends(get_current_sysadmin)):
     conn.commit()
     conn.close()
     return {"status": "success", "message": msg}
+
+# --- UPDATE ENDPOINTS ---
+import bcrypt
+from models import AdminUserUpdate, AdminServerUpdate
+
+@router.put("/user/{user_id}")
+def update_user(user_id: int, data: AdminUserUpdate, admin = Depends(get_current_sysadmin)):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Check if user exists
+        c.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+        if not c.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Build Query
+        fields = []
+        values = []
+        
+        if data.username is not None:
+            fields.append("username = ?")
+            values.append(data.username)
+        if data.display_name is not None:
+            fields.append("display_name = ?")
+            values.append(data.display_name)
+        if data.email is not None:
+            fields.append("email = ?")
+            values.append(data.email)
+        if data.is_sysadmin is not None:
+            # Prevent removing own admin status if you are the only one? maybe too complex for now.
+            fields.append("is_sysadmin = ?")
+            values.append(1 if data.is_sysadmin else 0)
+        if data.password is not None and len(data.password) > 0:
+            fields.append("password_hash = ?")
+            hashed = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            values.append(hashed)
+            
+        if not fields:
+            conn.close()
+            return {"status": "success", "message": "No changes"}
+            
+        values.append(user_id)
+        query = f"UPDATE users SET {', '.join(fields)} WHERE id = ?"
+        
+        c.execute(query, tuple(values))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "message": "User updated"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.put("/server/{server_id}")
+def update_server(server_id: str, data: AdminServerUpdate, admin = Depends(get_current_sysadmin)):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Check server
+        c.execute("SELECT id FROM servers WHERE id = ?", (server_id,))
+        if not c.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Server not found")
+            
+        fields = []
+        values = []
+        
+        if data.name is not None:
+            fields.append("name = ?")
+            values.append(data.name)
+        
+        if data.owner_id is not None:
+            # Check if new owner exists
+            c.execute("SELECT id FROM users WHERE id = ?", (data.owner_id,))
+            if not c.fetchone():
+                conn.close()
+                return {"status": "error", "message": "New owner user ID not found"}
+            
+            fields.append("owner_id = ?")
+            values.append(data.owner_id)
+            
+            # Also make them owner in members table
+            c.execute("UPDATE members SET role = 'owner' WHERE server_id = ? AND user_id = ?", (server_id, data.owner_id))
+            # Insert if not exists?
+            c.execute("INSERT OR IGNORE INTO members (server_id, user_id, role) VALUES (?, ?, 'owner')", (server_id, data.owner_id))
+
+        if not fields:
+            conn.close()
+            return {"status": "success", "message": "No changes"}
+            
+        values.append(server_id)
+        query = f"UPDATE servers SET {', '.join(fields)} WHERE id = ?"
+        
+        c.execute(query, tuple(values))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "message": "Server updated"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+

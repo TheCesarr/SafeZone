@@ -22,9 +22,29 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
 
     // --- OVERVIEW ACTIONS ---
     const handleSaveOverview = async () => {
-        // Mock implementation for server name update
-        toast.info("Sunucu adı güncelleme henüz aktif değil, ama buraya gelecek!");
-    }
+        if (!serverName.trim()) return toast.error("Sunucu adı boş olamaz!");
+
+        try {
+            const response = await fetch(getUrl(`/server/${server.id}/settings`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, name: serverName })
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                toast.success("Sunucu ayarları güncellendi!");
+                // Reload to refresh data (simplest approach for now)
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                toast.error(data.message || "Güncelleme başarısız.");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Bir hata oluştu.");
+        }
+    };
 
     // --- ROLES ACTIONS ---
     const fetchRoles = async (targetRoleId = null) => {

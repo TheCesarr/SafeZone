@@ -173,10 +173,14 @@ async def edit_message(data: dict):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
             
-        # Verify ownership
+        # Verify ownership or SysAdmin
         c.execute("SELECT sender_id FROM channel_messages WHERE id = ?", (message_id,))
         msg = c.fetchone()
-        if not msg or msg['sender_id'] != user['id']:
+
+        is_owner = msg and msg['sender_id'] == user['id']
+        is_sysadmin = user.get('is_sysadmin')
+
+        if not msg or (not is_owner and not is_sysadmin):
             conn.close()
             return {"status": "error", "message": "Unauthorized"}
             
@@ -437,6 +441,16 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str):
             
     lobby.active_connections[user_id] = websocket
     log_event("LOBBY", f"Lobby connection: {user_id}. Total: {len(lobby.active_connections)}")
+
+    # FORCE ONLINE STATUS
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE users SET status = 'online' WHERE username = ?", (user_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        log_event("ERROR", f"Status update error: {e}")
     
     await broadcast_room_update()
     
@@ -457,7 +471,7 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str):
                     new_status = msg.get('status')
                     if new_status in ['online', 'idle', 'dnd', 'invisible']:
                         # Update DB
-                        conn = sqlite3.connect(DB_NAME)
+                        conn = get_db_connection()
                         c = conn.cursor()
                         # Find username from token logic or passed user_id (here user_id is username)
                         c.execute("UPDATE users SET status = ? WHERE username = ?", (new_status, user_id))
@@ -472,6 +486,16 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str):
     except WebSocketDisconnect:
         if user_id in lobby.active_connections and lobby.active_connections[user_id] == websocket:
             del lobby.active_connections[user_id]
+        
+        # SET OFFLINE
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("UPDATE users SET status = 'offline' WHERE username = ?", (user_id,))
+            conn.commit()
+            conn.close()
+        except: pass
+
         await broadcast_room_update()
 
 
