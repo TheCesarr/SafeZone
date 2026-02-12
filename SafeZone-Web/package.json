@@ -15,8 +15,8 @@
     "start:client": "node set-build.cjs client && npm run electron:dev",
     "start:admin": "node set-build.cjs admin && npm run electron:dev",
     "dist": "vite build && electron-builder",
-    "build:client": "node set-build.cjs client && npm run dist",
-    "build:admin": "node set-build.cjs admin && npm run dist"
+    "build:client": "node set-build.cjs client && vite build && electron-builder --config.productName=\"SafeZone Client\" --config.appId=\"com.safezone.client\"",
+    "build:admin": "node set-build.cjs admin && vite build && electron-builder --config.productName=\"SafeZone Admin\" --config.appId=\"com.safezone.admin\""
   },
   "build": {
     "appId": "com.safezone.app",

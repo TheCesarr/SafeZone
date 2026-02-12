@@ -128,25 +128,41 @@ function App() {
   // --- 4. EFFECTS & HELPERS ---
 
   // Admin Auto-Login
+  // Admin Auto-Login Logic
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+
   useEffect(() => {
     const checkAdmin = async () => {
-      // Check if Electron API is available
       if (window.SAFEZONE_API) {
-        const type = await window.SAFEZONE_API.getBuildType();
-        if (type === 'admin') {
-          // If we are already logged in as sysadmin, no need to auto-login, 
-          // but we might want to ensure we have the view set to true initially.
-          if (!authState.token) {
+        try {
+          // Add a small delay to ensure IPC is ready
+          await new Promise(r => setTimeout(r, 500));
+
+          const type = await window.SAFEZONE_API.getBuildType();
+          console.log('Build Type:', type);
+
+          if (type === 'admin') {
             const secret = await window.SAFEZONE_API.getAdminSecret();
+            console.log('Admin Secret Found:', !!secret);
             if (secret) {
-              handleAdminLogin(secret);
+              // Must await this to keep loading screen up
+              await handleAdminLogin(secret);
             }
           }
+        } catch (e) {
+          console.error("Admin Check Error:", e);
         }
       }
+      setIsCheckingAdmin(false);
     };
-    checkAdmin();
-  }, [authState.token]);
+
+    // Only run if we don't have a token
+    if (!authState.token) {
+      checkAdmin();
+    } else {
+      setIsCheckingAdmin(false);
+    }
+  }, []); // Run once on mount
 
   // Theme Background
   useEffect(() => {
@@ -247,6 +263,27 @@ function App() {
 
 
   // --- 5. RENDER (The big block) ---
+
+  if (isCheckingAdmin) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: '#2f3136',
+        color: '#fff',
+        flexDirection: 'column',
+        gap: 20,
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{ fontSize: 40 }}>🛡️</div>
+        <h2>SafeZone Başlatılıyor...</h2>
+        <p style={{ color: '#b9bbbe' }}>Sistem kontrol ediliyor...</p>
+      </div>
+    );
+  }
+
   // If SysAdmin and in Admin View, show Dashboard
   if (authState.user?.is_sysadmin && adminView) {
     return (
