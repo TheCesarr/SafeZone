@@ -27,7 +27,7 @@ const FriendsDashboard = ({
     friends,
     friendRequests,
     onlineUserIds,
-    userStatuses,
+    userStatuses = {}, // Default to empty object
     handleRespondRequest,
     setShowAddFriend,
     handleStartDM,
@@ -39,9 +39,9 @@ const FriendsDashboard = ({
     const [addFriendInput, setAddFriendInput] = useState('');
 
     // Filter Logic
-    const safeFriends = friends || [];
-    const onlineFriends = safeFriends.filter(f => onlineUserIds.includes(f.username) && userStatuses[f.username] !== 'invisible');
-    const allFriends = safeFriends;
+    const safeFriends = Array.isArray(friends) ? friends : [];
+    const onlineFriends = safeFriends.filter(f => f && f.username && onlineUserIds.includes(f.username) && userStatuses?.[f.username] !== 'invisible');
+    const allFriends = safeFriends.filter(f => f && f.username);
     const pendingRequests = friendRequests || [];
 
     const bgColor = colors?.background || '#36393f';
@@ -163,7 +163,7 @@ const FriendsDashboard = ({
                                         </div>
                                         <div style={{ display: 'flex', gap: '10px' }}>
                                             <div title="Mesaj" style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: colors?.card || '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: mutedColor, cursor: 'pointer' }}>💬</div>
-                                            <div title="Diğer" onClick={(e) => { e.stopPropagation(); handleRemoveFriend(friend.username); }} style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: colors?.card || '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ed4245', cursor: 'pointer' }}>🗑️</div>
+                                            <div title="Diğer" onClick={(e) => { e.stopPropagation(); if (handleRemoveFriend) handleRemoveFriend(friend.id || friend.username); }} style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: colors?.card || '#2f3136', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ed4245', cursor: 'pointer' }}>🗑️</div>
                                         </div>
                                     </div>
                                 );

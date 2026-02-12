@@ -300,9 +300,6 @@ const AdminDashboard = ({ authState, onLogout, colors, onJoinServer, onSwitchToC
                         <span>🛡️</span> SafeZone
                     </h1>
                     <p style={{ fontSize: 12, color: '#b9bbbe', marginTop: 5 }}>Admin Paneli v2.0</p>
-                    <div style={{ fontSize: 10, color: 'lime', marginTop: 5 }}>
-                        DEBUG: {authState.user?.username} | Admin: {authState.user?.is_sysadmin ? "YES" : "NO"}
-                    </div>
                 </div>
 
                 <div style={{ flex: 1, padding: 10 }}>

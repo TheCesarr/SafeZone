@@ -228,25 +228,25 @@ async def delete_message(data: dict):
         conn.close()
         
         # Broadcast Deletion
-        # We need to broadcast to the room. Since this is an HTTP endpoint, we need to find the active room or broadcast via some mechanism.
-        # Ideally, we should unify this, but for now we can try to find the room in memory if it's a voice room, 
-        # OR just rely on client polling? No, client doesn't poll.
-        # We need to access `rooms` from state.
         from state import rooms
+        channel_id_str = str(msg['channel_id'])
         
-        # If it's a voice room match
-        if msg['channel_id'] in rooms:
+        # LOGGING
+        log_event("DEBUG", f"Attempting to broadcast delete for channel {channel_id_str}. Active rooms: {list(rooms.keys())}")
+        
+        if channel_id_str in rooms:
             import json
             deletion_event = json.dumps({
                 "type": "message_deleted",
                 "message_id": message_id,
-                "channel_id": msg['channel_id']
+                "channel_id": channel_id_str
             })
-            for connection in rooms[msg['channel_id']].active_connections:
+            log_event("DEBUG", f"Broadcasting deletion to {len(rooms[channel_id_str].active_connections)} clients")
+            for connection in rooms[channel_id_str].active_connections:
                 try:
                     await connection['ws'].send_text(deletion_event)
-                except:
-                    pass
+                except Exception as e:
+                    log_event("ERROR", f"Failed to send delete event: {e}")
         
         # For Text Channels, we don't have a "Room" object in memory usually unless we have a specific websocket for it.
         # SafeZone seems to use `lobby` for global updates, OR `room_endpoint` for specific rooms.

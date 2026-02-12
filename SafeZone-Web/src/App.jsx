@@ -566,7 +566,15 @@ function App() {
               friends={serverData.friends}
               requests={serverData.friendRequests}
               onlineUserIds={lobby.onlineUserIds}
-              onAddFriend={() => setShowAddFriend(true)}
+              userStatuses={lobby.userStatuses}
+              setShowAddFriend={setShowAddFriend}
+              handleAddFriend={serverData.addFriend}
+              handleRemoveFriend={serverData.removeFriend}
+              handleRespondRequest={serverData.respondFriendRequest}
+              handleStartDM={(friend) => {
+                lobby.startDM(friend);
+                unread.markDMRead(friend.username);
+              }}
             />
           )}
         </div>
