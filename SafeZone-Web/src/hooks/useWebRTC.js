@@ -45,9 +45,11 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     }
 
     // --- SIGNAL HANDLING ---
+    // --- SIGNAL HANDLING ---
     const handleVoiceMessage = async (event) => {
         const msg = JSON.parse(event.data);
-        if (msg.target && msg.target !== uuid.current) return;
+        const myId = authState.user?.username || uuid.current;
+        if (msg.target && msg.target !== myId) return;
 
         if (msg.type === 'user_list') {
             setConnectedUsers(msg.users);
@@ -80,13 +82,13 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         } else if (msg.type === 'system' && msg.action === 'please_offer') {
             startMeshConnection(msg.users || activeUsersRef.current);
         } else if (msg.type === 'offer') {
-            if (msg.uuid === uuid.current) return
+            if (msg.uuid === myId) return
             await handleOffer(msg)
         } else if (msg.type === 'answer') {
             const pc = peerConnections.current[msg.uuid];
             if (pc) await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
         } else if (msg.type === 'ice') {
-            if (msg.uuid === uuid.current) return
+            if (msg.uuid === myId) return
             const pc = peerConnections.current[msg.uuid];
             if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)) } catch (e) { }
         }
@@ -235,70 +237,28 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             const stream = event.streams[0];
             const track = event.track;
 
-            // Distinguish content based on Video tracks? 
-            // Better: use 'stream.id' to allow multiple streams per user.
-            // But we need to know WHICH type it is (Camera vs Screen). 
-            // Currently, we assume if it has video, it's screen share (since we don't have camera feature yet).
-            // Future-proofing: We'll separate by stream ID.
-
             if (track.kind === 'audio') {
-                // Manage multiple audio elements per user
-                let audioArray = remoteAudioRefs.current[targetUuid] || [];
-
-                // Check if we already have an element for this STREAM
-                // (One stream might have multiple tracks, but usually passed as one object)
-                const existingEl = audioArray.find(el => el.srcObject && el.srcObject.id === stream.id);
-
-                if (!existingEl) {
-                    const audioElement = new Audio();
-                    audioElement.autoplay = true;
-                    audioElement.volume = 1.0;
-                    audioElement.muted = isDeafened; // Global Deafen
-                    if (selectedOutputId && audioElement.setSinkId) {
-                        audioElement.setSinkId(selectedOutputId).catch(console.error);
-                    }
-                    audioElement.srcObject = stream;
-                    audioElement.play().catch(e => console.error("Play error", e));
-
-                    audioArray.push(audioElement);
-                    remoteAudioRefs.current[targetUuid] = audioArray;
-                }
+                // Update React State so <VoiceRoom /> can render <audio>
+                setRemoteStreams(prev => ({ ...prev, [targetUuid]: stream }));
             } else if (track.kind === 'video') {
                 // Determine if this is Screen Share or Camera
                 // For now, in this app version, ANY video is Screen Share 
-                // (unless we add Camera support later).
-                // Let's assume all video is screen for now to fix the bug.
-                // OR: We can check if existing audio stream is different.
-
-                // FIX: Store specifically as ScreenShare for UI
                 setRemoteScreenStreams(prev => ({ ...prev, [targetUuid]: stream }));
-
-                // Also add to remoteStreams if we want to treat it generically? No, keep separate.
             }
 
             // Handle stream removal
             stream.onremovetrack = () => {
                 // Check if tracks are empty
                 if (stream.getTracks().length === 0) {
-                    // Cleanup audio
-                    let audioArray = remoteAudioRefs.current[targetUuid];
-                    if (audioArray) {
-                        const idx = audioArray.findIndex(el => el.srcObject?.id === stream.id);
-                        if (idx !== -1) {
-                            audioArray[idx].pause();
-                            audioArray.splice(idx, 1);
-                            remoteAudioRefs.current[targetUuid] = audioArray;
-                        }
-                    }
-
-                    // Cleanup video
+                    setRemoteStreams(prev => {
+                        const next = { ...prev };
+                        if (next[targetUuid]?.id === stream.id) delete next[targetUuid];
+                        return next;
+                    });
                     setRemoteScreenStreams(prev => {
-                        if (prev[targetUuid]?.id === stream.id) {
-                            const next = { ...prev };
-                            delete next[targetUuid];
-                            return next;
-                        }
-                        return prev;
+                        const next = { ...prev };
+                        if (next[targetUuid]?.id === stream.id) delete next[targetUuid];
+                        return next;
                     });
                 }
             };
@@ -324,8 +284,9 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
     const startMeshConnection = async (users) => {
         if (!users) return;
+        const myId = authState.user?.username || uuid.current;
         for (const user of users) {
-            if (user.uuid === uuid.current) continue;
+            if (user.uuid === myId) continue;
             if (peerConnections.current[user.uuid]) continue;
 
             const pc = createPC(user.uuid);
@@ -412,12 +373,16 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
                 if (avg > THRESHOLD && !isSpeakingLocal) {
                     isSpeakingLocal = true;
-                    setSpeakingUsers(prev => new Set([...prev, uuid.current]));
+                    // FIX: Use the same ID as the WebSocket connection/Server
+                    const effectiveUuid = authState.user?.username || uuid.current;
+                    setSpeakingUsers(prev => new Set([...prev, effectiveUuid]));
+                    // activeVoiceChannel is already set if we are here
                     sendSignal({ type: 'speaking', is_speaking: true });
                 } else if (avg < SILENCE && isSpeakingLocal) {
                     isSpeakingLocal = false;
+                    const effectiveUuid = authState.user?.username || uuid.current;
                     setSpeakingUsers(prev => {
-                        const n = new Set(prev); n.delete(uuid.current); return n;
+                        const n = new Set(prev); n.delete(effectiveUuid); return n;
                     });
                     sendSignal({ type: 'speaking', is_speaking: false });
                 }
@@ -436,9 +401,10 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         if (localStream.current) {
             localStream.current.getAudioTracks().forEach(t => t.enabled = !newMuted);
         }
+        const myId = authState.user?.username || uuid.current;
         setVoiceStates(prev => ({
             ...prev,
-            [uuid.current]: { isMuted: newMuted, isDeafened, isScreenSharing }
+            [myId]: { isMuted: newMuted, isDeafened, isScreenSharing }
         }));
         sendSignal({ type: 'user_state', is_muted: newMuted, is_deafened: isDeafened, is_screen_sharing: isScreenSharing });
     }
@@ -457,9 +423,10 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         if (localStream.current) {
             localStream.current.getAudioTracks().forEach(track => track.enabled = newDeafened ? false : !isMuted);
         }
+        const myId = authState.user?.username || uuid.current;
         setVoiceStates(prev => ({
             ...prev,
-            [uuid.current]: { isMuted, isDeafened: newDeafened, isScreenSharing }
+            [myId]: { isMuted, isDeafened: newDeafened, isScreenSharing }
         }));
         sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: newDeafened, is_screen_sharing: isScreenSharing });
     }
@@ -484,9 +451,10 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             await Promise.all(promises);
 
             setIsScreenSharing(true);
+            const myId = authState.user?.username || uuid.current;
             setVoiceStates(prev => ({
                 ...prev,
-                [uuid.current]: { isMuted, isDeafened, isScreenSharing: true }
+                [myId]: { isMuted, isDeafened, isScreenSharing: true }
             }));
             sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: isDeafened, is_screen_sharing: true });
         } catch (e) {
@@ -524,9 +492,10 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         await Promise.all(promises);
 
         setIsScreenSharing(false);
+        const myId = authState.user?.username || uuid.current;
         setVoiceStates(prev => ({
             ...prev,
-            [uuid.current]: { isMuted, isDeafened, isScreenSharing: false }
+            [myId]: { isMuted, isDeafened, isScreenSharing: false }
         }));
         sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: isDeafened, is_screen_sharing: false });
     }
