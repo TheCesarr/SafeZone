@@ -3,25 +3,22 @@ import React, { useState, useRef, useEffect } from 'react';
 const VoiceRoom = ({
     selectedChannel,
     remoteStreams,
-    remoteScreenStreams,
+    remoteScreenStreams = {},
     activeUsersRef,
     isScreenSharing,
     screenStreamRef,
-    connectedUsers,
-    voiceStates,
+    connectedUsers = [],
+    voiceStates = {},
     activeVoiceChannel,
     remoteAudioRefs,
     serverMembers,
-    speakingUsers,
+    speakingUsers = new Set(),
     colors
 }) => {
     // Stage Management
     const [focusedStreamId, setFocusedStreamId] = useState(null);
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, userId: null });
     const contextMenuRef = useRef(null);
-
-    // REMOVED AUTO-FOCUS EFFECT
-    // Users must click "Watch Stream" manually.
 
     // Close Context Menu on Click Outside
     useEffect(() => {
@@ -36,14 +33,16 @@ const VoiceRoom = ({
 
     // Helpers
     const getUser = (uuid) => {
+        if (!uuid) return { username: 'Unknown' };
         return serverMembers?.find(m => m.uuid === uuid || m.username === uuid) ||
-            activeUsersRef.current.find(u => u.uuid === uuid) ||
+            activeUsersRef?.current?.find(u => u.uuid === uuid) ||
             { username: uuid };
     };
 
     const getDisplayName = (uuid) => {
+        if (!uuid) return "Unknown";
         const u = getUser(uuid);
-        return u.display_name || u.username || uuid;
+        return u?.display_name || u?.username || uuid;
     };
 
     const handleContextMenu = (e, userId) => {
@@ -57,40 +56,47 @@ const VoiceRoom = ({
     };
 
     const adjustVolume = (userId, val) => {
+        if (!remoteAudioRefs?.current) return;
         const audios = remoteAudioRefs.current[userId];
         if (Array.isArray(audios)) {
-            audios.forEach(a => a.volume = val);
+            audios.forEach(a => { if (a) a.volume = val; });
         } else if (audios) {
             audios.volume = val;
         }
     };
 
     const toggleLocalMute = (userId) => {
+        if (!remoteAudioRefs?.current) return;
         const audios = remoteAudioRefs.current[userId];
         const isMuted = Array.isArray(audios) ? audios[0]?.muted : audios?.muted;
         const newState = !isMuted;
 
         if (Array.isArray(audios)) {
-            audios.forEach(a => a.muted = newState);
+            audios.forEach(a => { if (a) a.muted = newState; });
         } else if (audios) {
             audios.muted = newState;
         }
-        // Force re-render to update menu text? (Not strict react state, but effective)
         setContextMenu({ ...contextMenu, visible: false });
     };
 
     // Calculate Grid Dimensions
     const getGridStyle = (count) => {
-        if (count <= 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' };
-        if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' };
-        if (count <= 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' };
-        if (count <= 9) return { gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)' };
+        const safeCount = count || 0;
+        if (safeCount <= 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' };
+        if (safeCount === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' };
+        if (safeCount <= 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' };
+        if (safeCount <= 9) return { gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)' };
         return { gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto' };
     };
 
-    // Render Logic
-    const hasActiveScreenShare = Object.keys(remoteScreenStreams).length > 0 || isScreenSharing;
+    // Safe Data Access
+    const safeRemoteScreenStreams = remoteScreenStreams || {};
+    const safeConnectedUsers = Array.isArray(connectedUsers) ? connectedUsers : [];
+    const hasActiveScreenShare = Object.keys(safeRemoteScreenStreams).length > 0 || isScreenSharing;
     const showStage = hasActiveScreenShare && focusedStreamId;
+
+    // Avatar Colors (Fallback)
+    const AVATAR_COLORS = ['#5865F2', '#EB459E', '#F2CC5D', '#3BA55C', '#FAA61A'];
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#000', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -105,15 +111,15 @@ const VoiceRoom = ({
                     }}
                     style={{ flex: '1 1 60%', backgroundColor: '#0e0e0e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative', borderBottom: '1px solid #202225' }}
                 >
-                    {focusedStreamId === 'local' && screenStreamRef.current ? (
+                    {focusedStreamId === 'local' && screenStreamRef?.current ? (
                         <video
                             ref={el => { if (el) el.srcObject = screenStreamRef.current }}
                             autoPlay playsInline muted
                             style={{ maxHeight: '100%', maxWidth: '100%', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}
                         />
-                    ) : remoteScreenStreams[focusedStreamId] ? (
+                    ) : safeRemoteScreenStreams[focusedStreamId] ? (
                         <video
-                            ref={el => { if (el) el.srcObject = remoteScreenStreams[focusedStreamId] }}
+                            ref={el => { if (el) el.srcObject = safeRemoteScreenStreams[focusedStreamId] }}
                             autoPlay playsInline
                             style={{ maxHeight: '100%', maxWidth: '100%', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}
                         />
@@ -145,18 +151,25 @@ const VoiceRoom = ({
                 overflowY: 'auto',
                 overflowX: showStage ? 'auto' : 'hidden',
                 alignItems: showStage ? 'center' : 'stretch',
-                ...(!showStage ? getGridStyle(connectedUsers.length) : {})
+                ...(!showStage ? getGridStyle(safeConnectedUsers.length) : {})
             }}>
-                {connectedUsers.map(user => {
-                    const isSpeaking = speakingUsers.has(user.uuid);
+                {safeConnectedUsers.map(user => {
+                    // Ultra-Defensive Checks
+                    if (!user || !user.uuid) return null;
+
+                    const isSpeaking = speakingUsers?.has(user.uuid);
                     const isMuted = voiceStates[user.uuid]?.isMuted;
                     const isDeafened = voiceStates[user.uuid]?.isDeafened;
                     const isSharing = voiceStates[user.uuid]?.isScreenSharing;
-                    const bg = colors ? colors[user.username.length % colors.length] : '#5865F2';
+
+                    // Safe Color Logic
+                    // Use AVATAR_COLORS array directly since 'colors' prop is a theme object
+                    const usernameLen = (user.username || "").length;
+                    const bg = AVATAR_COLORS[usernameLen % AVATAR_COLORS.length];
 
                     return (
                         <div
-                            key={user.uuid}
+                            key={user.uuid || Math.random()}
                             onContextMenu={(e) => handleContextMenu(e, user.uuid)}
                             style={{
                                 position: 'relative',
@@ -206,7 +219,7 @@ const VoiceRoom = ({
                             </div>
 
                             {/* Watch Stream Button (Manual) */}
-                            {isSharing && remoteScreenStreams[user.uuid] && focusedStreamId !== user.uuid && (
+                            {isSharing && safeRemoteScreenStreams[user.uuid] && focusedStreamId !== user.uuid && (
                                 <button
                                     onClick={() => setFocusedStreamId(user.uuid)}
                                     style={{ marginTop: '5px', background: '#5865F2', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
@@ -220,7 +233,7 @@ const VoiceRoom = ({
             </div>
 
             {/* CONTEXT MENU */}
-            {contextMenu.visible && (
+            {contextMenu.visible && contextMenu.userId && (
                 <div
                     ref={contextMenuRef}
                     style={{
@@ -240,12 +253,22 @@ const VoiceRoom = ({
                         {getDisplayName(contextMenu.userId).toUpperCase()}
                     </div>
 
+                    {/* NEW: Stop Watching Button */}
+                    {focusedStreamId === contextMenu.userId && (
+                        <div
+                            onClick={() => setFocusedStreamId(null)}
+                            style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', borderBottom: '1px solid #333', fontWeight: 'bold' }}
+                        >
+                            Yayını Durdur
+                        </div>
+                    )}
+
                     <div
                         onClick={() => toggleLocalMute(contextMenu.userId)}
                         style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', hover: { backgroundColor: '#5865F2' }, display: 'flex', justifyContent: 'space-between' }}
                     >
                         <span>Sessize Al</span>
-                        <input type="checkbox" checked={remoteAudioRefs.current[contextMenu.userId]?.[0]?.muted || false} readOnly />
+                        <input type="checkbox" checked={remoteAudioRefs?.current?.[contextMenu.userId]?.[0]?.muted || false} readOnly />
                     </div>
 
                     <div style={{ padding: '8px 12px', borderTop: '1px solid #333' }}>
@@ -260,6 +283,22 @@ const VoiceRoom = ({
                     </div>
                 </div>
             )}
+            {/* HIDDEN AUDIO ELEMENTS FOR VOICE */}
+            {safeConnectedUsers.map(user => (
+                <audio
+                    key={user.uuid || user.username}
+                    ref={el => {
+                        if (!remoteAudioRefs?.current) return;
+                        if (!remoteAudioRefs.current[user.uuid]) remoteAudioRefs.current[user.uuid] = [];
+                        remoteAudioRefs.current[user.uuid][0] = el;
+                        if (el && remoteStreams && remoteStreams[user.uuid]) {
+                            el.srcObject = remoteStreams[user.uuid];
+                        }
+                    }}
+                    autoPlay
+                    playsInline
+                />
+            ))}
         </div>
     );
 };

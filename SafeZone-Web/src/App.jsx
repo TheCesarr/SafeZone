@@ -273,6 +273,25 @@ function App() {
   const handleServerRightClick = (e, server) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, serverId: server.id }); }
   const handleUserContextMenu = (e, user) => { e.preventDefault(); e.stopPropagation(); setUserContextMenu({ x: e.clientX, y: e.clientY, user }); }
 
+  // Volume Control Helpers
+  const handleRemoteVolume = (userId, vol) => {
+    if (!webrtc.remoteAudioRefs.current) return;
+    const audios = webrtc.remoteAudioRefs.current[userId];
+    if (Array.isArray(audios)) audios.forEach(a => { if (a) a.volume = vol });
+    else if (audios) audios.volume = vol;
+  };
+
+  const handleRemoteMute = (userId) => {
+    if (!webrtc.remoteAudioRefs.current) return;
+    const audios = webrtc.remoteAudioRefs.current[userId];
+    const isMuted = Array.isArray(audios) ? audios[0]?.muted : audios?.muted;
+    if (Array.isArray(audios)) audios.forEach(a => { if (a) a.muted = !isMuted });
+    else if (audios) audios.muted = !isMuted;
+
+    // Force Menu Update (Hack)
+    setUserContextMenu(prev => ({ ...prev }));
+  };
+
   // Close menus
   useEffect(() => { const c = () => setContextMenu(null); if (contextMenu) document.addEventListener('click', c); return () => document.removeEventListener('click', c); }, [contextMenu]);
   useEffect(() => { const c = () => setUserContextMenu(null); if (userContextMenu) document.addEventListener('click', c); return () => document.removeEventListener('click', c); }, [userContextMenu]);
@@ -470,6 +489,7 @@ function App() {
           unread.markDMRead(friend.username);
         }}
         setContextMenu={setContextMenu}
+        handleUserContextMenu={handleUserContextMenu} // PASSED HERE
         selectedChannel={serverData.selectedChannel}
         activeVoiceChannel={webrtc.activeVoiceChannel}
         roomDetails={lobby.roomDetails}
@@ -557,6 +577,7 @@ function App() {
               activeUsersRef={{ current: webrtc.connectedUsers }}
               isScreenSharing={webrtc.isScreenSharing}
               screenStreamRef={webrtc.screenStreamRef}
+              remoteScreenStreams={webrtc.remoteScreenStreams}
               remoteAudioRefs={webrtc.remoteAudioRefs}
               serverMembers={serverData.serverMembers}
             />
@@ -671,6 +692,11 @@ function App() {
         onAddFriend={(u) => serverData.addFriend(u.username + "#" + (u.discriminator || "0000"))}
         onBlock={serverData.blockUser}
         onCopyId={(id) => { navigator.clipboard.writeText(id); setUserContextMenu(null); }}
+        // NEW PROPS FOR VOLUME
+        onMute={handleRemoteMute}
+        onVolumeChange={handleRemoteVolume}
+        volume={userContextMenu?.user && webrtc.remoteAudioRefs.current[userContextMenu.user.uuid || userContextMenu.user.username]?.[0]?.volume}
+        isMuted={userContextMenu?.user && webrtc.remoteAudioRefs.current[userContextMenu.user.uuid || userContextMenu.user.username]?.[0]?.muted}
       />
 
       <MessageContextMenu

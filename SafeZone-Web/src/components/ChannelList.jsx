@@ -19,6 +19,7 @@ const ChannelList = ({
     setShowChannelCreateModal,
     handleChannelClick,
     setContextMenu,
+    handleUserContextMenu,
     selectedChannel,
     activeVoiceChannel,
     roomDetails,
@@ -216,9 +217,18 @@ const ChannelList = ({
                                                     }}>
                                                         {displayName.slice(0, 1).toUpperCase()}
                                                     </div>
-                                                    <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title={displayName}>
-                                                        {displayName}
-                                                    </span>
+                                                    <div
+                                                        onContextMenu={(e) => {
+                                                            if (handleUserContextMenu) {
+                                                                handleUserContextMenu(e, member || { username: uid }); // Fallback to minimal user obj
+                                                            }
+                                                        }}
+                                                        style={{ flex: 1, overflow: 'hidden', cursor: 'pointer' }}
+                                                    >
+                                                        <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }} title={displayName}>
+                                                            {displayName}
+                                                        </span>
+                                                    </div>
                                                     {/* Show mute/deafen icons for all users */}
                                                     {(() => {
                                                         const userVoiceState = isCurrentUser ? { isMuted, isDeafened, isScreenSharing } : (voiceStates[uid] || {});

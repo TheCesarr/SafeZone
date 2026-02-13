@@ -633,6 +633,7 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):
             if data.get("type") == "user_state":
                 conn_info['is_muted'] = data.get("is_muted", False)
                 conn_info['is_deafened'] = data.get("is_deafened", False)
+                conn_info['is_screen_sharing'] = data.get("is_screen_sharing", False)
                 # Broadcast new state to everyone in room
                 await broadcast_user_list(room_id)
                 continue 

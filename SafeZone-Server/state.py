@@ -79,7 +79,8 @@ async def broadcast_user_list(room_id: str):
         users.append({
             "uuid": conn['user_id'],
             "is_muted": conn.get('is_muted', False),
-            "is_deafened": conn.get('is_deafened', False)
+            "is_deafened": conn.get('is_deafened', False),
+            "is_screen_sharing": conn.get('is_screen_sharing', False)
         })
 
     message = { "type": "user_list", "users": users }

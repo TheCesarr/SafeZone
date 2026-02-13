@@ -561,7 +561,20 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         screenStreamRef,
 
         isNoiseCancelled,
-        toggleNoiseCancellation: async () => { /* ... existing noise calc logic ... */ }
+        toggleNoiseCancellation: async () => {
+            const newState = !isNoiseCancelled;
+            setIsNoiseCancelled(newState);
+            if (localStream.current) {
+                localStream.current.getAudioTracks().forEach(track => {
+                    track.applyConstraints({
+                        noiseSuppression: newState,
+                        echoCancellation: newState,
+                        autoGainControl: newState
+                    }).catch(e => console.warn("Noise cancellation constraint failed:", e));
+                });
+            }
+            // Persist setting if needed, but for now just state
+        }
     };
 }
 
