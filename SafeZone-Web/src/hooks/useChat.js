@@ -27,7 +27,8 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         if (!channel || channel.type === 'voice') return; // Voice handles its own chat in roomWs (mostly)
 
         if (chatWs.current) chatWs.current.close();
-        const wsUrl = getUrl(`/ws/room/${channel.id}/${uuid.current}`, 'ws');
+        const userId = authState.user?.username || uuid.current;
+        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}`, 'ws');
         chatWs.current = new WebSocket(wsUrl);
 
         chatWs.current.onmessage = (event) => {
@@ -134,7 +135,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
             type: 'chat',
             text: inputText,
             sender: authState.user.username,
-            uuid: uuid.current,
+            uuid: authState.user?.username || uuid.current,
             attachment_url: attachment?.url,
             attachment_type: attachment?.type,
             attachment_name: attachment?.name
