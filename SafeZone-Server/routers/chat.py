@@ -551,12 +551,26 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):
             return
 
     room = rooms[room_id]
+
+    # --- GHOST SESSION CLEANUP ---
+    # If this user already has a connection in this room (e.g. reconnect after crash),
+    # forcibly close and remove the old one to prevent duplicate entries.
+    ghost_sessions = [c for c in room.active_connections if c['user_id'] == user_id]
+    for ghost in ghost_sessions:
+        try:
+            await ghost['ws'].close()
+        except:
+            pass
+        room.active_connections.remove(ghost)
+        log_event("CLEANUP", f"Ghost session removed for {user_id} in {room.name}")
+
     # Initialize with default audio state
     conn_info = {
         'ws': websocket, 
         'user_id': user_id,
         'is_muted': False,
-        'is_deafened': False
+        'is_deafened': False,
+        'is_screen_sharing': False
     }
     room.active_connections.append(conn_info)
     

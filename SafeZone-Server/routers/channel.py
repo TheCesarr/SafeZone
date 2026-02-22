@@ -28,7 +28,7 @@ async def create_channel(data: ChannelCreate):
         
         # 3. Create Channel
         channel_id = str(uuid.uuid4())
-        category_id = getattr(data, 'category_id', None) if hasattr(data, 'category_id') else None
+        category_id = getattr(data, 'category_id', None)
         c.execute("INSERT INTO channels (id, server_id, name, type, category_id) VALUES (?, ?, ?, ?, ?)",
                  (channel_id, data.server_id, data.channel_name, data.channel_type, category_id))
         

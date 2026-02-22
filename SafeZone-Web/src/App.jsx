@@ -601,57 +601,98 @@ function App() {
         </div>
       </div>
 
+      {/* --- GLOBAL PERSISTENT AUDIO --- */}
+      {/* Renders audio for connected users regardless of current view */}
+      {webrtc.connectedUsers.map(user => (
+        <audio
+          key={user.uuid || user.username}
+          ref={el => {
+            if (!webrtc.remoteAudioRefs?.current) return;
+            // Use username as key if uuid missing (consistent with other parts)
+            const key = user.uuid || user.username;
+            if (!webrtc.remoteAudioRefs.current[key]) webrtc.remoteAudioRefs.current[key] = [];
+
+            // Store as first element (Index 0 is Mic)
+            webrtc.remoteAudioRefs.current[key][0] = el;
+
+            if (el && webrtc.remoteStreams && webrtc.remoteStreams[key]) {
+              // Only update if srcObject is different to avoid interruptions
+              if (el.srcObject !== webrtc.remoteStreams[key]) {
+                el.srcObject = webrtc.remoteStreams[key];
+              }
+            }
+          }}
+          autoPlay
+          playsInline
+          // Apply Output Device
+          onPlay={(e) => {
+            if (selectedOutputId && selectedOutputId !== 'default' && e.target.setSinkId) {
+              e.target.setSinkId(selectedOutputId).catch(console.error);
+            }
+          }}
+        />
+      ))}
+
+
       {/* MODALS */}
-      {showCreateServer && (
-        <Modal title="Sunucu Oluştur" onClose={() => { setShowCreateServer(false); setModalInput(""); }} colors={colors}>
-          <p style={{ color: '#aaa', marginBottom: '16px' }}>Yeni sunucunun adı ne olsun?</p>
-          <input autoFocus type="text" placeholder="Sunucu Adı" value={modalInput} onChange={e => setModalInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSimpleCreateServer()} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-            <button onClick={() => { setShowCreateServer(false); setModalInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
-            <button onClick={onSimpleCreateServer} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Oluştur</button>
-          </div>
-        </Modal>
-      )}
+      {
+        showCreateServer && (
+          <Modal title="Sunucu Oluştur" onClose={() => { setShowCreateServer(false); setModalInput(""); }} colors={colors}>
+            <p style={{ color: '#aaa', marginBottom: '16px' }}>Yeni sunucunun adı ne olsun?</p>
+            <input autoFocus type="text" placeholder="Sunucu Adı" value={modalInput} onChange={e => setModalInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSimpleCreateServer()} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button onClick={() => { setShowCreateServer(false); setModalInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
+              <button onClick={onSimpleCreateServer} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Oluştur</button>
+            </div>
+          </Modal>
+        )
+      }
 
-      {showJoinServer && (
-        <Modal title="Sunucuya Katıl" onClose={() => { setShowJoinServer(false); setModalInput(""); }} colors={colors}>
-          <p style={{ color: '#aaa', marginBottom: '16px' }}>Arkadaşının attığı davet kodunu gir.</p>
-          <input autoFocus type="text" placeholder="Davet Kodu" value={modalInput} onChange={e => setModalInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSimpleJoinServer()} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-            <button onClick={() => { setShowJoinServer(false); setModalInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
-            <button onClick={onSimpleJoinServer} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Katıl</button>
-          </div>
-        </Modal>
-      )}
+      {
+        showJoinServer && (
+          <Modal title="Sunucuya Katıl" onClose={() => { setShowJoinServer(false); setModalInput(""); }} colors={colors}>
+            <p style={{ color: '#aaa', marginBottom: '16px' }}>Arkadaşının attığı davet kodunu gir.</p>
+            <input autoFocus type="text" placeholder="Davet Kodu" value={modalInput} onChange={e => setModalInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSimpleJoinServer()} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button onClick={() => { setShowJoinServer(false); setModalInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
+              <button onClick={onSimpleJoinServer} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Katıl</button>
+            </div>
+          </Modal>
+        )
+      }
 
-      {showChannelCreateModal && (
-        <Modal title="Kanal Oluştur" onClose={() => setShowChannelCreateModal(false)} colors={colors}>
-          <input autoFocus type="text" placeholder="Kanal ismi" value={newChannelName} onChange={e => setNewChannelName(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSimpleCreateChannel()} style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
-          <div style={{ marginBottom: '16px', display: 'flex', gap: '10px' }}>
-            <button onClick={() => setNewChannelType('text')} className="interactive-button" style={{ flex: 1, padding: '10px', background: newChannelType === 'text' ? colors.accent : '#333', color: '#fff', border: 'none', borderRadius: '4px' }}>💬 Yazılı</button>
-            <button onClick={() => setNewChannelType('voice')} className="interactive-button" style={{ flex: 1, padding: '10px', background: newChannelType === 'voice' ? colors.accent : '#333', color: '#fff', border: 'none', borderRadius: '4px' }}>🔊 Sesli</button>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button onClick={() => { setShowChannelCreateModal(false); setNewChannelName(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
-            <button onClick={onSimpleCreateChannel} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Oluştur</button>
-          </div>
-        </Modal>
-      )}
+      {
+        showChannelCreateModal && (
+          <Modal title="Kanal Oluştur" onClose={() => setShowChannelCreateModal(false)} colors={colors}>
+            <input autoFocus type="text" placeholder="Kanal ismi" value={newChannelName} onChange={e => setNewChannelName(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSimpleCreateChannel()} style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
+            <div style={{ marginBottom: '16px', display: 'flex', gap: '10px' }}>
+              <button onClick={() => setNewChannelType('text')} className="interactive-button" style={{ flex: 1, padding: '10px', background: newChannelType === 'text' ? colors.accent : '#333', color: '#fff', border: 'none', borderRadius: '4px' }}>💬 Yazılı</button>
+              <button onClick={() => setNewChannelType('voice')} className="interactive-button" style={{ flex: 1, padding: '10px', background: newChannelType === 'voice' ? colors.accent : '#333', color: '#fff', border: 'none', borderRadius: '4px' }}>🔊 Sesli</button>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowChannelCreateModal(false); setNewChannelName(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
+              <button onClick={onSimpleCreateChannel} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Oluştur</button>
+            </div>
+          </Modal>
+        )
+      }
 
-      {showAddFriend && (
-        <Modal title="Arkadaş Ekle" onClose={() => { setShowAddFriend(false); setFriendInput(""); }} colors={colors}>
-          <p style={{ color: '#aaa', marginBottom: '16px' }}>Örnek: admin#1234</p>
-          <input autoFocus type="text" placeholder="username#1234" value={friendInput} onChange={e => setFriendInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && serverData.addFriend(friendInput).then(s => s && setShowAddFriend(false))} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-            <button onClick={() => { setShowAddFriend(false); setFriendInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
-            <button onClick={() => {
-              serverData.addFriend(friendInput).then(success => {
-                if (success) { showToast("Arkadaş eklendi!", "success"); setShowAddFriend(false); setFriendInput(""); }
-              });
-            }} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Ekle</button>
-          </div>
-        </Modal>
-      )}
+      {
+        showAddFriend && (
+          <Modal title="Arkadaş Ekle" onClose={() => { setShowAddFriend(false); setFriendInput(""); }} colors={colors}>
+            <p style={{ color: '#aaa', marginBottom: '16px' }}>Örnek: admin#1234</p>
+            <input autoFocus type="text" placeholder="username#1234" value={friendInput} onChange={e => setFriendInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && serverData.addFriend(friendInput).then(s => s && setShowAddFriend(false))} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #333', background: '#222', color: '#fff' }} />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button onClick={() => { setShowAddFriend(false); setFriendInput(""); }} className="interactive-button" style={{ padding: '8px 16px', background: 'transparent', color: '#aaa', border: 'none' }}>İptal</button>
+              <button onClick={() => {
+                serverData.addFriend(friendInput).then(success => {
+                  if (success) { showToast("Arkadaş eklendi!", "success"); setShowAddFriend(false); setFriendInput(""); }
+                });
+              }} className="interactive-button" style={{ padding: '8px 16px', background: colors.accent, color: '#fff', border: 'none', borderRadius: '4px' }}>Ekle</button>
+            </div>
+          </Modal>
+        )
+      }
 
       {/* SETTINGS PANELS */}
       <SettingsPanel
@@ -672,14 +713,16 @@ function App() {
         setAudioSettings={setAudioSettings}
       />
 
-      {showServerSettings && (
-        <ServerSettings
-          server={serverData.selectedServer}
-          onClose={() => setShowServerSettings(false)}
-          authState={authState}
-          colors={colors}
-        />
-      )}
+      {
+        showServerSettings && (
+          <ServerSettings
+            server={serverData.selectedServer}
+            onClose={() => setShowServerSettings(false)}
+            authState={authState}
+            colors={colors}
+          />
+        )
+      }
 
       {/* CONTEXT MENUS */}
       <ServerContextMenu
@@ -707,18 +750,20 @@ function App() {
       />
 
       {/* Persistent Screen Share Overlay */}
-      {webrtc.isScreenSharing && webrtc.screenStreamRef.current && (serverData.selectedChannel?.type !== 'voice') && (
-        <StreamOverlay
-          stream={webrtc.screenStreamRef.current}
-          label="Ekranın Paylaşılıyor"
-          onStop={webrtc.stopScreenShare}
-        />
-      )}
+      {
+        webrtc.isScreenSharing && webrtc.screenStreamRef.current && (serverData.selectedChannel?.type !== 'voice') && (
+          <StreamOverlay
+            stream={webrtc.screenStreamRef.current}
+            label="Ekranın Paylaşılıyor"
+            onStop={webrtc.stopScreenShare}
+          />
+        )
+      }
 
       {/* TOAST NOTIFICATIONS */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
-    </div>
+    </div >
   )
 }
 

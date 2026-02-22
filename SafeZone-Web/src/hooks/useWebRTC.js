@@ -45,7 +45,6 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     }
 
     // --- SIGNAL HANDLING ---
-    // --- SIGNAL HANDLING ---
     const handleVoiceMessage = async (event) => {
         const msg = JSON.parse(event.data);
         const myId = authState.user?.username || uuid.current;
@@ -55,12 +54,12 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             setConnectedUsers(msg.users);
             activeUsersRef.current = msg.users;
 
-            // Sync voice states
+            // Rebuild voice states from fresh user list — drops departed users' stale state
             const states = {};
             msg.users.forEach(u => {
                 states[u.uuid] = { isMuted: u.is_muted, isDeafened: u.is_deafened, isScreenSharing: u.is_screen_sharing };
             });
-            setVoiceStates(prev => ({ ...prev, ...states }));
+            setVoiceStates(states);
         } else if (msg.type === 'chat' || msg.type === 'history') {
             if (onMessageReceived) onMessageReceived(msg);
         } else if (msg.type === 'user_state') {
@@ -96,6 +95,14 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
     const connectingRef = useRef(null);
 
+    const closeWebSocketAsync = (ws) => new Promise((resolve) => {
+        if (!ws || ws.readyState === WebSocket.CLOSED) { resolve(); return; }
+        ws.onclose = () => resolve();
+        ws.close();
+        // Safety timeout — don't hang longer than 1 second
+        setTimeout(resolve, 1000);
+    });
+
     // --- MAIN CONNECTION LOGIC ---
     const connectToRoom = async (channel) => {
         if (connectingRef.current === channel.id) return;
@@ -103,8 +110,11 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
         connectingRef.current = channel.id;
 
+        // Wait for old WS to fully close before opening new one.
+        // This ensures the server processes the disconnect BEFORE the new connection arrives,
+        // preventing ghost/duplicate user entries.
         if (roomWs.current) {
-            roomWs.current.close();
+            await closeWebSocketAsync(roomWs.current);
             roomWs.current = null;
         }
 
@@ -202,6 +212,9 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         setRemoteScreenStreams({});
         setActiveVoiceChannel(null);
         setConnectedUsers([]);
+        setIsMuted(false);
+        setIsDeafened(false);
+        setIsScreenSharing(false);
 
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
@@ -238,7 +251,12 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             const track = event.track;
 
             if (track.kind === 'audio') {
-                // Update React State so <VoiceRoom /> can render <audio>
+                // Check if this stream has video tracks (Screen Share)
+                // If it has video, it's screen share audio, so we ignore it for 'remoteStreams' (Mic).
+                // The <video> element in VoiceRoom will play this audio.
+                if (stream.getVideoTracks().length > 0) return;
+
+                // Update React State so <App /> can render <audio>
                 setRemoteStreams(prev => ({ ...prev, [targetUuid]: stream }));
             } else if (track.kind === 'video') {
                 // Determine if this is Screen Share or Camera
@@ -344,20 +362,30 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     // --- VOICE ACTIVITY DETECTION (VAD) ---
     const setupVoiceActivityDetection = (stream) => {
         try {
+            // Stop any existing animation loop before starting a new one
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             }
             const audioContext = audioContextRef.current;
-            if (analyserRef.current) {
-                // Reuse?
-            } else {
+
+            if (!analyserRef.current) {
                 analyserRef.current = audioContext.createAnalyser();
                 analyserRef.current.fftSize = 512;
                 analyserRef.current.smoothingTimeConstant = 0.8;
             }
             const analyser = analyserRef.current;
 
+            // Disconnect old source before connecting a new one to prevent stacking
+            if (analyserRef.current._source) {
+                try { analyserRef.current._source.disconnect(); } catch (e) { }
+            }
             const source = audioContext.createMediaStreamSource(stream);
+            analyserRef.current._source = source;
             source.connect(analyser);
 
             const bufferLength = analyser.frequencyBinCount;
@@ -373,10 +401,8 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
                 if (avg > THRESHOLD && !isSpeakingLocal) {
                     isSpeakingLocal = true;
-                    // FIX: Use the same ID as the WebSocket connection/Server
                     const effectiveUuid = authState.user?.username || uuid.current;
                     setSpeakingUsers(prev => new Set([...prev, effectiveUuid]));
-                    // activeVoiceChannel is already set if we are here
                     sendSignal({ type: 'speaking', is_speaking: true });
                 } else if (avg < SILENCE && isSpeakingLocal) {
                     isSpeakingLocal = false;
@@ -389,7 +415,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
                 animationFrameRef.current = requestAnimationFrame(update);
             }
             update();
-        } catch (e) { console.error("VAD Auth Error", e); }
+        } catch (e) { console.error("VAD Error", e); }
     }
 
     // --- CONTROLS ---
@@ -469,6 +495,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         screenTracks.forEach(t => t.stop());
         screenStreamRef.current = null;
 
+        // Remove screen tracks from all peer connections
         Object.values(peerConnections.current).forEach(pc => {
             const senders = pc.getSenders();
             senders.forEach(s => {
@@ -476,18 +503,15 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
                     try { pc.removeTrack(s); } catch (e) { }
                 }
             });
-            // Renegotiate removal
-            pc.createOffer().then(offer => {
-                pc.setLocalDescription(offer);
-                // We don't strictly need to send offer for removal in some cases, but good practice
-            }).catch(console.error);
         });
 
-        // Notify others
+        // Renegotiate with all peers (single pass, no duplication)
         const promises = Object.entries(peerConnections.current).map(async ([targetUuid, pc]) => {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
+            } catch (e) { console.error('stopScreenShare renegotiation error:', e); }
         });
         await Promise.all(promises);
 
@@ -508,7 +532,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         isMuted,
         isDeafened,
         isScreenSharing,
-        remoteStreams,      // Camera Streams (Empty for now)
+        remoteStreams,      // Microphone Streams { [userId]: MediaStream }
         remoteScreenStreams,// Screen Streams
         setConnectedUsers,
         setVoiceStates,

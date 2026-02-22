@@ -24,12 +24,12 @@ const VoiceRoom = ({
     useEffect(() => {
         const handleClick = (e) => {
             if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
-                setContextMenu({ ...contextMenu, visible: false });
+                setContextMenu(prev => ({ ...prev, visible: false }));
             }
         };
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, [contextMenu]);
+    }, []); // Empty deps: listener registered once, uses functional updater to avoid stale closure
 
     // Helpers
     const getUser = (uuid) => {
@@ -284,21 +284,7 @@ const VoiceRoom = ({
                 </div>
             )}
             {/* HIDDEN AUDIO ELEMENTS FOR VOICE */}
-            {safeConnectedUsers.map(user => (
-                <audio
-                    key={user.uuid || user.username}
-                    ref={el => {
-                        if (!remoteAudioRefs?.current) return;
-                        if (!remoteAudioRefs.current[user.uuid]) remoteAudioRefs.current[user.uuid] = [];
-                        remoteAudioRefs.current[user.uuid][0] = el;
-                        if (el && remoteStreams && remoteStreams[user.uuid]) {
-                            el.srcObject = remoteStreams[user.uuid];
-                        }
-                    }}
-                    autoPlay
-                    playsInline
-                />
-            ))}
+            {/* HIDDEN AUDIO ELEMENTS MOVED TO APP.JSX FOR PERSISTENCE */}
         </div>
     );
 };

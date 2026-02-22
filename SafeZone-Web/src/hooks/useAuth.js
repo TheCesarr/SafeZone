@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getUrl } from '../utils/api';
-import { useToast } from './useToast'; // Correct import if needed, assuming useToast handles its own import or passed via context. actually App.jsx passes it? No App.jsx uses it.
-// Wait, useAuth doesn't use useToast in the original code, it imports `toast` from utils.
 import toast from '../utils/toast';
 
 export const useAuth = () => {
@@ -47,7 +45,7 @@ export const useAuth = () => {
     const handleLogin = async (email, password) => {
         setAuthError(null);
         try {
-            const res = await fetch(getUrl('/auth/login'), {
+            const res = await fetch(getUrl('/auth/login', 'http'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
