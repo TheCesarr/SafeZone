@@ -36,6 +36,23 @@ ipcMain.on('notify', (event, { title, body }) => {
     }
 });
 
+// IPC Handler: Return all screen + window sources with thumbnails for picker UI
+ipcMain.handle('get-sources', async () => {
+    try {
+        const sources = await desktopCapturer.getSources({
+            types: ['screen', 'window'],
+            thumbnailSize: { width: 320, height: 180 }
+        });
+        return sources.map(s => ({
+            id: s.id,
+            name: s.name,
+            thumbnail: s.thumbnail.toDataURL()
+        }));
+    } catch (e) {
+        console.error('[Electron] getSources error:', e);
+        return [];
+    }
+});
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -68,7 +85,7 @@ function createWindow() {
 
     win.once('ready-to-show', () => {
         win.show();
-        // Open DevTools to debug black screen
+        // DevTools: Ctrl+Shift+I veya F12 ile açılabilir
         // win.webContents.openDevTools();
     });
 
