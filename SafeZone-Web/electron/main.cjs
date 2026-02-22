@@ -82,11 +82,17 @@ function createWindow() {
 
     win.setMenuBarVisibility(false);
 
-    // Handle Screen Share Requests (getDisplayMedia)
+    // Screen Share Handler: renderer passes the chosen sourceId via getUserMedia constraints.
+    // We map it back to the correct desktopCapturer source.
     win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
-        desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-            // Grant access to the first screen available.
-            callback({ video: sources[0], audio: 'loopback' });
+        desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
+            // The renderer sends the sourceId via getUserMedia({ video: { mandatory: { chromeMediaSourceId } } })
+            // Electron passes this as request.frame with the chromeMediaSourceId embedded.
+            const sourceId = request.frame.url.split('chromeMediaSourceId=')[1];
+            const selectedSource = sources.find(source => source.id === sourceId);
+
+            // Fallback: first screen if nothing specific is requested or found.
+            callback({ video: selectedSource || sources[0], audio: 'loopback' });
         }).catch((err) => {
             console.error(err);
         });

@@ -13,12 +13,24 @@ const VoiceRoom = ({
     remoteAudioRefs,
     serverMembers,
     speakingUsers = new Set(),
+    screenSources = [],          // Array of { id, name, thumbnail } for picker
+    startScreenShareWithSource,  // (sourceId) => void
+    onCancelScreenPicker,        // () => void
     colors
 }) => {
     // Stage Management
     const [focusedStreamId, setFocusedStreamId] = useState(null);
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, userId: null });
     const contextMenuRef = useRef(null);
+
+    // Auto-focus local screen share in Stage when sharing starts
+    useEffect(() => {
+        if (isScreenSharing) {
+            setFocusedStreamId('local');
+        } else {
+            setFocusedStreamId(prev => prev === 'local' ? null : prev);
+        }
+    }, [isScreenSharing]);
 
     // Close Context Menu on Click Outside
     useEffect(() => {
@@ -100,6 +112,63 @@ const VoiceRoom = ({
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#000', height: '100%', position: 'relative', overflow: 'hidden' }}>
+
+            {/* === SCREEN PICKER MODAL === */}
+            {screenSources.length > 0 && (
+                <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'rgba(0,0,0,0.88)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 200,
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'flex-start',
+                    padding: '32px 24px',
+                    overflowY: 'auto',
+                }}>
+                    <div style={{ width: '100%', maxWidth: '900px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h2 style={{ margin: 0, color: '#fff', fontSize: '20px', fontWeight: '700' }}>🖥️ Paylaşılacak Ekranı Seç</h2>
+                            <button
+                                onClick={onCancelScreenPicker}
+                                style={{ background: 'rgba(237,66,69,0.15)', border: '1px solid rgba(237,66,69,0.4)', borderRadius: '8px', color: '#ed4245', cursor: 'pointer', padding: '6px 14px', fontSize: '13px', fontWeight: '600' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(237,66,69,0.3)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(237,66,69,0.15)'}
+                            >✕ İptal</button>
+                        </div>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                            gap: '16px',
+                        }}>
+                            {screenSources.map(src => (
+                                <div
+                                    key={src.id}
+                                    onClick={() => startScreenShareWithSource?.(src.id)}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.05)',
+                                        border: '2px solid rgba(255,255,255,0.1)',
+                                        borderRadius: '10px',
+                                        overflow: 'hidden',
+                                        cursor: 'pointer',
+                                        transition: 'border-color 0.15s, transform 0.15s',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#5865F2'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.transform = 'scale(1)'; }}
+                                >
+                                    <img
+                                        src={src.thumbnail}
+                                        alt={src.name}
+                                        style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block', background: '#111' }}
+                                    />
+                                    <div style={{ padding: '8px 12px', color: '#dcddde', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {src.name}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 1. STAGE */}
             {showStage && (

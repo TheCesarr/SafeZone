@@ -581,6 +581,9 @@ function App() {
               remoteScreenStreams={webrtc.remoteScreenStreams}
               remoteAudioRefs={webrtc.remoteAudioRefs}
               serverMembers={serverData.serverMembers}
+              screenSources={webrtc.screenSources}
+              startScreenShareWithSource={webrtc.startScreenShareWithSource}
+              onCancelScreenPicker={() => webrtc.setScreenSources([])}
             />
           ) : (
             <FriendsDashboard

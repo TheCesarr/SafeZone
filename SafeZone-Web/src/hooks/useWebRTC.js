@@ -458,18 +458,56 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     }
 
     // --- SCREEN SHARE ---
-    const startScreenShare = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-            screenStreamRef.current = stream;
+    const [screenSources, setScreenSources] = useState([]); // List of picker sources
 
+    // Step 1: Open picker — fetch sources from Electron and store them (VoiceRoom renders the modal)
+    const startScreenShare = async () => {
+        if (window.SAFEZONE_API?.getSources) {
+            // Electron: get sources with thumbnails for the picker modal
+            try {
+                const sources = await window.SAFEZONE_API.getSources();
+                setScreenSources(sources); // VoiceRoom will render picker modal
+            } catch (e) {
+                console.error('getSources error:', e);
+            }
+            return; // Wait for user selection
+        }
+        // Browser fallback: direct getDisplayMedia
+        await startScreenShareWithSource(null);
+    };
+
+    // Step 2: User selected a source in the picker — actually capture it
+    const startScreenShareWithSource = async (sourceId) => {
+        setScreenSources([]); // Close picker
+        try {
+            let stream;
+            if (sourceId && window.SAFEZONE_API?.getSources) {
+                // Electron path: use chromeMediaSourceId (bypasses getDisplayMedia handler cleanly)
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: 'desktop',
+                            chromeMediaSourceId: sourceId,
+                            minWidth: 1280,
+                            maxWidth: 1920,
+                            minHeight: 720,
+                            maxHeight: 1080,
+                        }
+                    }
+                });
+            } else {
+                // Browser fallback
+                stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            }
+
+            screenStreamRef.current = stream;
             stream.getVideoTracks()[0].onended = () => stopScreenShare();
 
             const promises = Object.entries(peerConnections.current).map(async ([targetUuid, pc]) => {
                 stream.getTracks().forEach(track => {
                     pc.addTrack(track, stream);
                 });
-
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
                 sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
@@ -484,37 +522,36 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             }));
             sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: isDeafened, is_screen_sharing: true });
         } catch (e) {
-            console.error("Screen Share Error:", e);
+            console.error('Screen Share Error:', e);
         }
-    }
+    };
+
 
     const stopScreenShare = async () => {
         if (!screenStreamRef.current) return;
 
         const screenTracks = screenStreamRef.current.getTracks();
+
+        // Replace each screen track with null in all senders
+        // (replaceTrack keeps the m= SDP line intact → audio mid never shifts → voice stays working)
+        await Promise.all(
+            Object.values(peerConnections.current).map(async (pc) => {
+                const senders = pc.getSenders();
+                const replacePromises = senders
+                    .filter(s => s.track && screenTracks.includes(s.track))
+                    .map(s => {
+                        try { return s.replaceTrack(null); } catch (e) { return Promise.resolve(); }
+                    });
+                await Promise.all(replacePromises);
+            })
+        );
+
+        // Stop and clear the local screen stream
         screenTracks.forEach(t => t.stop());
         screenStreamRef.current = null;
 
-        // Remove screen tracks from all peer connections
-        Object.values(peerConnections.current).forEach(pc => {
-            const senders = pc.getSenders();
-            senders.forEach(s => {
-                if (s.track && screenTracks.includes(s.track)) {
-                    try { pc.removeTrack(s); } catch (e) { }
-                }
-            });
-        });
-
-        // Renegotiate with all peers (single pass, no duplication)
-        const promises = Object.entries(peerConnections.current).map(async ([targetUuid, pc]) => {
-            try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
-            } catch (e) { console.error('stopScreenShare renegotiation error:', e); }
-        });
-        await Promise.all(promises);
-
+        // No renegotiation needed — replaceTrack(null) doesn't change SDP structure.
+        // Sending user_state is enough for peers to know sharing stopped.
         setIsScreenSharing(false);
         const myId = authState.user?.username || uuid.current;
         setVoiceStates(prev => ({
@@ -523,6 +560,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         }));
         sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: isDeafened, is_screen_sharing: false });
     }
+
 
     return {
         activeVoiceChannel,
@@ -547,11 +585,14 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         createPC,
         startMeshConnection,
         startScreenShare,
+        startScreenShareWithSource,
         stopScreenShare,
 
         peerConnections,
         remoteAudioRefs,
         screenStreamRef,
+        screenSources,
+        setScreenSources,
 
         isNoiseCancelled,
         toggleNoiseCancellation: async () => {
