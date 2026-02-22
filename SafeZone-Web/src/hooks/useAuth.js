@@ -29,7 +29,10 @@ export const useAuth = () => {
                                 display_name: data.display_name,
                                 discriminator: data.discriminator,
                                 email: data.email,
-                                is_sysadmin: data.is_sysadmin
+                                is_sysadmin: data.is_sysadmin,
+                                avatar_url: data.avatar_url || null,
+                                avatar_color: data.avatar_color || '#5865F2',
+                                status: data.status || 'online'
                             }
                         });
                     } else {
@@ -60,7 +63,10 @@ export const useAuth = () => {
                         display_name: data.display_name,
                         discriminator: data.discriminator,
                         email: data.email,
-                        is_sysadmin: data.is_sysadmin
+                        is_sysadmin: data.is_sysadmin,
+                        avatar_url: data.avatar_url || null,
+                        avatar_color: data.avatar_color || '#5865F2',
+                        status: data.status || 'online'
                     }
                 });
             } else {
@@ -170,6 +176,15 @@ export const useAuth = () => {
         window.location.reload(); // Cleanest restart
     }
 
+    // Merge partial user fields into authState without reload
+    // Used by SettingsPanel after avatar/profile changes
+    const updateUser = (fields) => {
+        setAuthState(prev => ({
+            ...prev,
+            user: { ...prev.user, ...fields }
+        }));
+    };
+
     return {
         authState,
         authMode, setAuthMode,
@@ -179,6 +194,7 @@ export const useAuth = () => {
         handleRegister,
         handleResetPassword,
         handleLogout,
-        handleAdminLogin
+        handleAdminLogin,
+        updateUser
     };
 }

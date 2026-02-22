@@ -200,6 +200,17 @@ def init_db():
                     FOREIGN KEY(creator_id) REFERENCES users(id) ON DELETE CASCADE
                 )''')
 
+    # VOICE LOGS (Feature: Voice Channel History)
+    c.execute('''CREATE TABLE IF NOT EXISTS voice_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id TEXT NOT NULL,
+                    channel_name TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(channel_id) REFERENCES channels(id) ON DELETE CASCADE
+                )''')
+
     conn.commit()
     conn.close()
 

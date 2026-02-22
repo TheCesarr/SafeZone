@@ -5,11 +5,7 @@ import toast from '../utils/toast';
 
 // v2: Added connectToChannel and message handling
 export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
-    // DEBUG AUTH
-    useEffect(() => {
-        console.log("[useChat] AuthState Updated:", authState);
-        console.log("[useChat] is_sysadmin:", authState.user?.is_sysadmin);
-    }, [authState]);
+    const currentUsername = authState.user?.username || '';
 
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState("");
@@ -42,6 +38,19 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
             if (msg.sender !== authState.user.username) {
                 SoundManager.playMessage();
                 if (onUnreadMessage) onUnreadMessage();
+
+                // @Mention detection
+                const myUsername = authState.user?.username || '';
+                if (myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)) {
+                    SoundManager.playMention();
+                    // Electron push notification (only when window is not focused)
+                    if (window.SAFEZONE_API?.notify) {
+                        window.SAFEZONE_API.notify(
+                            `@${msg.sender} seni mention etti`,
+                            msg.text.length > 80 ? msg.text.slice(0, 80) + '…' : msg.text
+                        );
+                    }
+                }
             }
             setMessages(prev => [...prev, {
                 sender: msg.sender,

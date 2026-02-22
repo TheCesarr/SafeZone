@@ -7,6 +7,7 @@ const SettingsPanel = ({
     show,
     onClose,
     authState,
+    onProfileUpdate,
     theme,
     setTheme,
     colors,
@@ -27,6 +28,7 @@ const SettingsPanel = ({
     // Profile Edit State
     const [editDisplayName, setEditDisplayName] = useState(authState.user?.display_name || "");
     const [editAvatarColor, setEditAvatarColor] = useState(authState.user?.avatar_color || "#5865F2");
+    const [avatarPreview, setAvatarPreview] = useState(null); // Local preview after upload
     const fileInputRef = useRef(null);
 
     // Mic Test State
@@ -123,6 +125,10 @@ const SettingsPanel = ({
         const file = e.target.files[0];
         if (!file) return;
 
+        // Show instant local preview
+        const localUrl = URL.createObjectURL(file);
+        setAvatarPreview(localUrl);
+
         const formData = new FormData();
         formData.append('token', authState.token);
         formData.append('file', file);
@@ -134,14 +140,17 @@ const SettingsPanel = ({
             });
             const data = await res.json();
             if (data.status === 'success') {
-                toast.success("Avatar yüklendi! Lütfen sayfayı yenileyin.");
-                // Simply for preview if we had an avatar_url state
+                toast.success('Avatar güncellendi ✓');
+                // Update global authState so every component sees the new avatar immediately
+                if (onProfileUpdate) onProfileUpdate({ avatar_url: data.avatar_url });
             } else {
-                toast.error("Hata: " + data.message);
+                toast.error('Hata: ' + data.message);
+                setAvatarPreview(null); // Revert preview on error
             }
         } catch (err) {
             console.error(err);
-            toast.error("Yükleme hatası");
+            toast.error('Yükleme hatası');
+            setAvatarPreview(null);
         }
     }
 
@@ -150,7 +159,7 @@ const SettingsPanel = ({
 
     const handleSaveProfile = async () => {
         try {
-            await fetch(getUrl('/user/profile/update'), {
+            const res = await fetch(getUrl('/user/profile/update'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -159,9 +168,18 @@ const SettingsPanel = ({
                     avatar_color: editAvatarColor
                 })
             });
-            toast.success("Profil güncellendi! (Yenileme gerekebilir)");
-            // In a real app, successful response would update authState context
-        } catch (e) { console.error(e); toast.error("Hata"); }
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.success('Profil güncellendi ✓');
+                // Push changes to global authState immediately - no reload needed
+                if (onProfileUpdate) onProfileUpdate({
+                    display_name: editDisplayName,
+                    avatar_color: editAvatarColor
+                });
+            } else {
+                toast.error('Hata: ' + (data.message || 'Bilinmeyen hata'));
+            }
+        } catch (e) { console.error(e); toast.error('Hata'); }
     }
 
     return (
@@ -209,13 +227,15 @@ const SettingsPanel = ({
                                         onClick={() => fileInputRef.current?.click()}
                                         style={{
                                             width: '100%', height: '100%', borderRadius: '50%',
-                                            background: authState.user?.avatar_url ? `url(${getUrl(authState.user.avatar_url)}) center/cover` : editAvatarColor,
+                                            background: (avatarPreview || authState.user?.avatar_url)
+                                                ? `url(${avatarPreview || getUrl(authState.user.avatar_url)}) center/cover`
+                                                : editAvatarColor,
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             fontSize: '32px', color: '#fff', cursor: 'pointer', overflow: 'hidden',
                                             border: '2px solid rgba(255,255,255,0.2)'
                                         }}
                                     >
-                                        {!authState.user?.avatar_url && authState.user?.display_name?.[0]?.toUpperCase()}
+                                        {!(avatarPreview || authState.user?.avatar_url) && authState.user?.display_name?.[0]?.toUpperCase()}
                                         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.6)', fontSize: '10px', textAlign: 'center', padding: '2px' }}>DEĞİŞTİR</div>
                                     </div>
                                     <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} style={{ display: 'none' }} accept="image/*" />

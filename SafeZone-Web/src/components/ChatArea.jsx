@@ -26,11 +26,14 @@ const ChatArea = ({
     setEditText,
     submitEdit,
     handleMessageContextMenu,
+    onlineMembers = [], // For @mention autocomplete
     colors = {}
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
     const messagesEndRef = useRef(null);
+    const [mentionQuery, setMentionQuery] = React.useState(null); // '@' + typed text
+    const [mentionSuggestions, setMentionSuggestions] = React.useState([]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,6 +50,7 @@ const ChatArea = ({
                     const sender = typeof msg === 'string' ? msg.split(': ')[0] : (selectedDM ? msg.sender : msg.sender);
                     const text = (typeof msg === 'string' ? msg.split(': ').slice(1).join(': ') : (selectedDM ? msg.content : (msg.content || msg.text))) || "";
                     const isMe = sender === currentUser.username;
+                    const isMentioned = !isMe && text.toLowerCase().includes(`@${currentUser.username.toLowerCase()}`);
 
                     // Group consecutive messages from the same sender
                     const prevMsg = currentMessages[i - 1];
@@ -63,6 +67,14 @@ const ChatArea = ({
                                 alignItems: 'flex-start',
                                 paddingTop: isGrouped ? '2px' : '10px',
                                 marginTop: isGrouped ? 0 : '4px',
+                                // @Mention highlight
+                                ...(isMentioned ? {
+                                    background: 'rgba(250, 166, 26, 0.08)',
+                                    borderLeft: '3px solid #FAA61A',
+                                    paddingLeft: '8px',
+                                    marginLeft: '-11px',
+                                    borderRadius: '0 4px 4px 0',
+                                } : {})
                             }}
                         >
                             {/* Avatar: show only for first message in group */}
@@ -287,7 +299,46 @@ const ChatArea = ({
             <div style={{
                 padding: '12px 20px 16px',
                 background: 'transparent',
+                position: 'relative',
             }}>
+                {/* @Mention Autocomplete Popup */}
+                {mentionSuggestions.length > 0 && (
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '70px',
+                        left: '20px',
+                        right: '20px',
+                        background: colors?.card || '#2f3136',
+                        border: `1px solid ${colors?.border || 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        zIndex: 100,
+                        boxShadow: '0 -4px 20px rgba(0,0,0,0.4)',
+                    }}>
+                        <div style={{ padding: '6px 12px', fontSize: '11px', color: colors?.textMuted || '#72767d', fontWeight: 'bold', textTransform: 'uppercase', borderBottom: `1px solid ${colors?.border || 'rgba(255,255,255,0.06)'}` }}>Üyeler</div>
+                        {mentionSuggestions.map(member => (
+                            <div
+                                key={member.username}
+                                onClick={() => {
+                                    const lastAt = inputText.lastIndexOf('@');
+                                    const newText = inputText.slice(0, lastAt) + `@${member.username} `;
+                                    setInputText(newText);
+                                    setMentionSuggestions([]);
+                                    setMentionQuery(null);
+                                }}
+                                style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: colors?.text || '#fff', transition: 'background 0.1s' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: member.avatar_color || '#5865F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', color: '#fff' }}>
+                                    {member.username.slice(0, 2).toUpperCase()}
+                                </div>
+                                <span style={{ fontWeight: '500' }}>{member.display_name || member.username}</span>
+                                <span style={{ fontSize: '11px', color: colors?.textMuted || '#72767d' }}>@{member.username}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
                 <div className="chat-input-wrapper">
                     <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
                     <span
@@ -314,12 +365,42 @@ const ChatArea = ({
                         type="text"
                         placeholder={`Mesaj gönder: ${selectedDM ? '@' + selectedDM.username : (selectedChannel ? '#' + selectedChannel.name : '')}`}
                         value={inputText}
-                        onChange={handleTyping}
+                        onChange={(e) => {
+                            handleTyping(e);
+                            // @mention autocomplete detection
+                            const val = e.target.value;
+                            const lastAt = val.lastIndexOf('@');
+                            if (lastAt !== -1 && lastAt === val.length - 1) {
+                                // Just typed @
+                                setMentionQuery('')
+                                setMentionSuggestions(onlineMembers.filter(m => m.username !== currentUser.username));
+                            } else if (lastAt !== -1) {
+                                const query = val.slice(lastAt + 1).split(' ')[0];
+                                if (!query.includes(' ')) {
+                                    setMentionQuery(query);
+                                    setMentionSuggestions(
+                                        onlineMembers.filter(m =>
+                                            m.username !== currentUser.username &&
+                                            m.username.toLowerCase().startsWith(query.toLowerCase())
+                                        )
+                                    );
+                                } else {
+                                    setMentionSuggestions([]);
+                                    setMentionQuery(null);
+                                }
+                            } else {
+                                setMentionSuggestions([]);
+                                setMentionQuery(null);
+                            }
+                        }}
                         onKeyDown={e => {
+                            if (e.key === 'Escape') { setMentionSuggestions([]); setMentionQuery(null); }
                             if (e.key === 'Enter') {
                                 e.preventDefault();
-                                if (selectedDM) onSendDM();
-                                else onSendMessage();
+                                if (mentionSuggestions.length === 0) {
+                                    if (selectedDM) onSendDM();
+                                    else onSendMessage();
+                                }
                             }
                         }}
                         style={{ color: colors?.text || '#fff' }}

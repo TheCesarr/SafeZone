@@ -35,7 +35,7 @@ function App() {
   const { toasts, showToast, removeToast } = useToast();
 
   // Auth Hook
-  const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, handleAdminLogin, isLoading: authLoading } = useAuth();
+  const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, handleAdminLogin, isLoading: authLoading, updateUser } = useAuth();
   const [authInput, setAuthInput] = useState({ email: '', username: '', password: '', display_name: '', recovery_pin: '' });
 
   // Refs (used by multiple hooks)
@@ -551,6 +551,7 @@ function App() {
                 editText={chat.editText}
                 setEditText={chat.setEditText}
                 submitEdit={chat.submitEdit}
+                onlineMembers={serverData.serverMembers || []}
               />
 
               {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}
@@ -699,6 +700,7 @@ function App() {
         show={showSettings}
         onClose={() => setShowSettings(false)}
         authState={authState}
+        onProfileUpdate={updateUser}
         theme={theme}
         setTheme={setTheme}
         colors={colors}

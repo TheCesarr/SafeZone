@@ -155,7 +155,7 @@ async def verify_token(data: dict):
             
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT username, display_name, discriminator, email, is_sysadmin FROM users WHERE token = ?", (token,))
+        c.execute("SELECT username, display_name, discriminator, email, is_sysadmin, avatar_url, avatar_color, status FROM users WHERE token = ?", (token,))
         user = c.fetchone()
         conn.close()
         
@@ -166,7 +166,10 @@ async def verify_token(data: dict):
                 "display_name": user['display_name'], 
                 "discriminator": user['discriminator'],
                 "email": user['email'],
-                "is_sysadmin": bool(user['is_sysadmin'])
+                "is_sysadmin": bool(user['is_sysadmin']),
+                "avatar_url": user['avatar_url'],
+                "avatar_color": user['avatar_color'] or '#5865F2',
+                "status": user['status'] or 'online'
             }
         else:
             return {"status": "error", "message": "Invalid token"}

@@ -75,6 +75,14 @@ class SoundManager {
             this.playTone(400, 0.3, 'sawtooth', 0.1);
         }
     }
+
+    // 7. @Mention — Double high-pitched ping, clearly distinct from regular message
+    playMention() {
+        this.playTone(1400, 0.1, 'sine', 0);
+        this.playTone(1800, 0.15, 'sine', 0.12);
+        this.playTone(1400, 0.1, 'sine', 0.3);
+        this.playTone(1800, 0.2, 'sine', 0.42);
+    }
 }
 
 export default new SoundManager();

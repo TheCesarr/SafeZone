@@ -22,6 +22,21 @@ async def broadcast(room, message: str):
 
 # --- HTTP Endpoints ---
 
+@router.get("/channel/{channel_id}/voice-log")
+async def get_voice_log(channel_id: str, token: str, limit: int = 50):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            "SELECT user_id, action, timestamp FROM voice_logs WHERE channel_id = ? ORDER BY timestamp DESC LIMIT ?",
+            (channel_id, limit)
+        )
+        rows = c.fetchall()
+        conn.close()
+        return {"status": "success", "logs": [dict(r) for r in rows]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.get("/channel/{channel_id}/messages")
 async def get_channel_messages(channel_id: str, token: str, before: int = None, limit: int = 100):
     try:
@@ -575,6 +590,18 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):
     room.active_connections.append(conn_info)
     
     log_event("CONNECT", f"{user_id} --> {room.name}")
+
+    # -- Voice Log: JOIN --
+    try:
+        vconn = get_db_connection()
+        vconn.execute(
+            "INSERT INTO voice_logs (channel_id, channel_name, user_id, action) VALUES (?, ?, ?, ?)",
+            (room_id, room.name, user_id, 'join')
+        )
+        vconn.commit()
+        vconn.close()
+    except Exception as ve:
+        log_event("WARN", f"Voice log join failed: {ve}")
     
     await broadcast_room_update()
     await broadcast_user_list(room_id)
@@ -665,5 +692,18 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):
             room.active_connections.remove(conn_info)
         
         log_event("DISCONNECT", f"{user_id} <-- {room.name}")
+
+        # -- Voice Log: LEAVE --
+        try:
+            vconn = get_db_connection()
+            vconn.execute(
+                "INSERT INTO voice_logs (channel_id, channel_name, user_id, action) VALUES (?, ?, ?, ?)",
+                (room_id, room.name, user_id, 'leave')
+            )
+            vconn.commit()
+            vconn.close()
+        except Exception as ve:
+            log_event("WARN", f"Voice log leave failed: {ve}")
+
         await broadcast_room_update()
         await broadcast_user_list(room_id)

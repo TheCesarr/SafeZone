@@ -1,4 +1,4 @@
-const { app, BrowserWindow, desktopCapturer, session, ipcMain } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session, ipcMain, Notification } = require('electron');
 const path = require('path');
 let buildConfig = { type: 'client', adminSecret: '' };
 try {
@@ -25,6 +25,17 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 // IPC Handlers for Dual Build
 ipcMain.handle('get-build-type', () => buildConfig.type);
 ipcMain.handle('get-admin-secret', () => buildConfig.adminSecret);
+
+// IPC Handler for Push Notifications
+// Only fires if the app window isn't focused (so no redundant pings)
+ipcMain.on('notify', (event, { title, body }) => {
+    const windows = BrowserWindow.getAllWindows();
+    const isFocused = windows.some(w => w.isFocused());
+    if (!isFocused && Notification.isSupported()) {
+        new Notification({ title, body, silent: false }).show();
+    }
+});
+
 
 function createWindow() {
     const win = new BrowserWindow({
