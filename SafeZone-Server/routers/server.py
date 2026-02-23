@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form
 from models import ServerCreate, ServerJoin, RoleCreate
 from database import get_db_connection
-from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_ROLES, PERM_KICK_MEMBERS, PERM_BAN_MEMBERS, PERM_MANAGE_CHANNELS, PERM_MANAGE_SERVER
+from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_ROLES, PERM_KICK_MEMBERS, PERM_BAN_MEMBERS, PERM_MANAGE_CHANNELS, PERM_MANAGE_SERVER, check_server_membership, validate_upload, ALLOWED_IMAGE_EXTS
 import uuid
 import secrets
 import sqlite3
@@ -47,7 +47,7 @@ async def create_server(data: ServerCreate):
         return {"status": "success", "server_id": server_id, "invite_code": invite_code}
         
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/list")
 async def list_user_servers(token: str):
@@ -80,7 +80,7 @@ async def list_user_servers(token: str):
         conn.close()
         return {"status": "success", "servers": servers}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/join")
 async def join_server(data: ServerJoin):
@@ -123,7 +123,7 @@ async def join_server(data: ServerJoin):
         return {"status": "success", "server_id": server['id'], "server_name": "Joined"}
         
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- MEMBER & ROLE MANAGEMENT ---
 
@@ -135,10 +135,16 @@ async def get_server_members(server_id: str, token: str):
         
         # Validate Token
         c.execute("SELECT id FROM users WHERE token = ?", (token,))
-        if not c.fetchone():
+        user = c.fetchone()
+        if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-            
+        conn.close()
+        # Authorization: requesting user must be a member of this server
+        if not check_server_membership(user['id'], server_id):
+            return {"status": "error", "message": "Erişim reddedildi."}
+        conn = get_db_connection()
+        c = conn.cursor()
         # 1. Fetch Members with Details
         c.execute('''
             SELECT m.user_id, u.username, u.display_name, u.discriminator, u.avatar_url, u.avatar_color, u.status, m.role as legacy_role
@@ -192,7 +198,7 @@ async def get_server_members(server_id: str, token: str):
         conn.close()
         return {"status": "success", "members": enriched_members}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/{server_id}/roles")
 async def get_server_roles(server_id: str):
@@ -204,7 +210,7 @@ async def get_server_roles(server_id: str):
         conn.close()
         return {"status": "success", "roles": roles}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/{server_id}/roles")
 async def create_role(server_id: str, data: RoleCreate):
@@ -249,7 +255,7 @@ async def create_role(server_id: str, data: RoleCreate):
         conn.close()
         return {"status": "success", "role": new_role}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/leave")
 async def leave_server(data: dict):
@@ -379,7 +385,7 @@ async def assign_role(server_id: str, role_id: int, data: dict):
         
         return {"status": "success", "message": "Rol atandı."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/{server_id}/roles/{role_id}/unassign")
 async def unassign_role(server_id: str, role_id: int, data: dict):
@@ -408,7 +414,7 @@ async def unassign_role(server_id: str, role_id: int, data: dict):
         
         return {"status": "success", "message": "Rol kaldırıldı."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.put("/{server_id}/roles/{role_id}")
 async def update_role(server_id: str, role_id: int, data: dict):
@@ -452,7 +458,7 @@ async def update_role(server_id: str, role_id: int, data: dict):
             "position": new_position, "permissions": new_permissions
         }}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.delete("/{server_id}/roles/{role_id}")
 async def delete_role(server_id: str, role_id: int, data: dict):
@@ -482,7 +488,7 @@ async def delete_role(server_id: str, role_id: int, data: dict):
         
         return {"status": "success", "message": "Rol silindi."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- MODERATION ENDPOINTS ---
 
@@ -523,7 +529,7 @@ async def kick_member(server_id: str, data: dict):
         create_audit_log(server_id, user['id'], "KICK", "USER", str(target_user_id), "Member kicked")
         return {"status": "success", "message": "Kullanıcı sunucudan atıldı."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/{server_id}/ban")
 async def ban_member(server_id: str, data: dict):
@@ -567,7 +573,7 @@ async def ban_member(server_id: str, data: dict):
         create_audit_log(server_id, user['id'], "BAN", "USER", str(target_user_id), reason or "No reason")
         return {"status": "success", "message": "Kullanıcı yasaklandı."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/{server_id}/unban")
 async def unban_member(server_id: str, data: dict):
@@ -596,7 +602,7 @@ async def unban_member(server_id: str, data: dict):
         create_audit_log(server_id, user['id'], "UNBAN", "USER", str(target_user_id))
         return {"status": "success", "message": "Yasak kaldırıldı."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/{server_id}/bans")
 async def get_bans(server_id: str, token: str):
@@ -627,7 +633,7 @@ async def get_bans(server_id: str, token: str):
         
         return {"status": "success", "bans": bans}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- AUDIT LOG ---
 
@@ -664,7 +670,7 @@ async def get_audit_log(server_id: str, token: str, limit: int = 50):
         
         return {"status": "success", "logs": logs}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- FAZ 4: SERVER SETTINGS ---
 
@@ -706,7 +712,7 @@ async def update_server_settings(server_id: str, data: dict):
                         f"name={new_name}")
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/{server_id}/icon")
 async def upload_server_icon(server_id: str, token: str = Form(...), file: UploadFile = File(...)):
@@ -724,23 +730,32 @@ async def upload_server_icon(server_id: str, token: str = Form(...), file: Uploa
         if not check_permission(user['id'], server_id, PERM_MANAGE_SERVER):
             conn.close()
             return {"status": "error", "message": "Yetkiniz yok!"}
+        conn.close()
+
+        # Read + validate file (size, extension, magic bytes)
+        content = await file.read()
+        is_valid, err_msg = validate_upload(content, file.filename, ALLOWED_IMAGE_EXTS)
+        if not is_valid:
+            return {"status": "error", "message": err_msg}
         
         # Save file
-        file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'png'
-        filename = f"server_{server_id[:8]}_{uuid.uuid4().hex[:8]}.{file_ext}"
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'png'
+        filename = f"server_{server_id[:8]}_{uuid.uuid4().hex[:8]}.{ext}"
         filepath = os.path.join("uploads", filename)
         
         with open(filepath, "wb") as f:
-            f.write(await file.read())
+            f.write(content)
         
         icon_url = f"/uploads/{filename}"
+        conn = get_db_connection()
+        c = conn.cursor()
         c.execute("UPDATE servers SET icon_url = ? WHERE id = ?", (icon_url, server_id))
         conn.commit()
         conn.close()
         
         return {"status": "success", "icon_url": icon_url}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "Dosya yükleme hatası"}
 
 # --- FAZ 4: INVITE SYSTEM ---
 
@@ -779,7 +794,7 @@ async def create_invite(server_id: str, data: dict):
         
         return {"status": "success", "code": code, "max_uses": max_uses, "expires_at": expires_at}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/{server_id}/invites")
 async def list_invites(server_id: str, token: str):
@@ -811,7 +826,7 @@ async def list_invites(server_id: str, token: str):
         
         return {"status": "success", "invites": invites}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.delete("/{server_id}/invites/{code}")
 async def delete_invite(server_id: str, code: str, data: dict):
@@ -838,7 +853,7 @@ async def delete_invite(server_id: str, code: str, data: dict):
         
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- CATEGORIES LIST ---
 
@@ -860,4 +875,4 @@ async def get_categories(server_id: str, token: str):
         
         return {"status": "success", "categories": categories}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)

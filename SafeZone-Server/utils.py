@@ -1,8 +1,108 @@
 import datetime
 import sqlite3
+import time as _time
 from database import get_db_connection
 
 LOG_FILE = "server_log.txt"
+
+# --- FILE UPLOAD SECURITY ---
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# Magic bytes for allowed file types.
+# Key = canonical file type, Value = list of (offset, bytes) tuples that must match
+ALLOWED_MAGIC = {
+    'jpg':  [(0, b'\xff\xd8\xff')],
+    'jpeg': [(0, b'\xff\xd8\xff')],
+    'png':  [(0, b'\x89PNG')],
+    'gif':  [(0, b'GIF87a'), (0, b'GIF89a')],
+    'webp': [(0, b'RIFF'), (8, b'WEBP')],
+    'mp4':  [(4, b'ftyp')],
+    'webm': [(0, b'\x1a\x45\xdf\xa3')],
+    'mov':  [(4, b'ftyp'), (4, b'moov')],
+    'pdf':  [(0, b'%PDF')],
+}
+
+# Extension groups allowed per context
+ALLOWED_IMAGE_EXTS  = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+ALLOWED_CHAT_EXTS   = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov', 'pdf'}
+
+def validate_upload(content: bytes, filename: str, allowed_exts: set) -> tuple[bool, str]:
+    """
+    Validates an uploaded file by:
+    1. Checking file size (<= MAX_UPLOAD_SIZE)
+    2. Checking the extension is in the allowed set
+    3. Reading magic bytes to verify file content matches declared type.
+
+    Returns (is_valid: bool, error_message: str | None)
+    """
+    # 1. Size check
+    if len(content) > MAX_UPLOAD_SIZE:
+        max_mb = MAX_UPLOAD_SIZE // (1024 * 1024)
+        return False, f"Dosya çok büyük! Maksimum {max_mb}MB yüklenebilir."
+
+    # 2. Extension check
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    if ext not in allowed_exts:
+        return False, f"Bu dosya türüne izin verilmiyor. İzin verilenler: {', '.join(sorted(allowed_exts))}"
+
+    # 3. Magic byte check
+    header = content[:16]
+    magic_rules = ALLOWED_MAGIC.get(ext)
+    if magic_rules:
+        matched = any(
+            header[offset:offset + len(magic)] == magic
+            for offset, magic in magic_rules
+        )
+        if not matched:
+            return False, "Dosya içeriği uzantısıyla eşleşmiyor. Lütfen gerçek bir dosya yükleyin."
+
+    return True, None
+
+
+# --- ERROR HANDLING (Information Disclosure Prevention) ---
+
+def safe_error(e: Exception, context: str = "") -> dict:
+    """
+    Logs the real exception internally and returns a generic,
+    non-revealing error response to the client.
+    Use this in every except block instead of returning str(e).
+    """
+    log_event("ERROR", f"Internal error [{context}]: {type(e).__name__}: {str(e)}")
+    return {"status": "error", "message": "İşlem sırasında bir hata oluştu."}
+
+
+# --- RATE LIMITING (Brute Force Prevention) ---
+# In-memory store: {action_key: [timestamp, timestamp, ...]}
+_rate_store: dict[str, list[float]] = {}
+
+def rate_limit_check(identifier: str, action: str, max_attempts: int = 10, window_seconds: int = 60) -> tuple[bool, str | None]:
+    """
+    Checks if `identifier` (e.g. an IP or email) has exceeded `max_attempts`
+    for `action` in the last `window_seconds`.
+
+    Returns (is_allowed: bool, error_message: str | None)
+    
+    Usage:
+        allowed, err = rate_limit_check(client_ip, "login", max_attempts=5, window_seconds=60)
+        if not allowed:
+            return {"status": "error", "message": err}
+    """
+    key = f"{action}:{identifier}"
+    now = _time.monotonic()
+    window_start = now - window_seconds
+
+    # Clean up old timestamps
+    timestamps = _rate_store.get(key, [])
+    timestamps = [t for t in timestamps if t > window_start]
+
+    if len(timestamps) >= max_attempts:
+        wait = int(window_seconds - (now - timestamps[0]))
+        return False, f"Çok fazla deneme. Lütfen {wait} saniye bekleyin."
+
+    timestamps.append(now)
+    _rate_store[key] = timestamps
+    return True, None
+
 
 def log_event(event_type: str, message: str):
     time_str = datetime.datetime.now().strftime("%H:%M:%S")
@@ -121,6 +221,48 @@ def get_user_by_token(token: str):
     user = c.fetchone()
     conn.close()
     return dict(user) if user else None
+
+def check_server_membership(user_id: int, server_id: str) -> bool:
+    """
+    Returns True if the user is a member of the given server, or is a SysAdmin.
+    Use this to guard any endpoint that reads server-specific data.
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        # SysAdmins have global access
+        c.execute("SELECT is_sysadmin FROM users WHERE id = ?", (user_id,))
+        row = c.fetchone()
+        if row and row['is_sysadmin']:
+            conn.close()
+            return True
+        # Check membership
+        c.execute("SELECT 1 FROM members WHERE server_id = ? AND user_id = ?", (server_id, user_id))
+        result = c.fetchone()
+        conn.close()
+        return result is not None
+    except Exception as e:
+        print(f"check_server_membership error: {e}")
+        return False
+
+def check_channel_membership(user_id: int, channel_id: str) -> bool:
+    """
+    Returns True if the user is a member of the server that owns the given channel.
+    Use this to guard any channel-specific data endpoint.
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        # Get the server_id this channel belongs to
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        channel = c.fetchone()
+        conn.close()
+        if not channel:
+            return False
+        return check_server_membership(user_id, channel['server_id'])
+    except Exception as e:
+        print(f"check_channel_membership error: {e}")
+        return False
 
 def create_audit_log(server_id: str, user_id: int, action: str, 
                      target_type: str = None, target_id: str = None, details: str = None):

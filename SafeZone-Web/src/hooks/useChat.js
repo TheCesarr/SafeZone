@@ -24,7 +24,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
         if (chatWs.current) chatWs.current.close();
         const userId = authState.user?.username || uuid.current;
-        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}`, 'ws');
+        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(authState.token)}`, 'ws');
         chatWs.current = new WebSocket(wsUrl);
 
         chatWs.current.onmessage = (event) => {

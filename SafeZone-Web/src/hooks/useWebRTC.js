@@ -129,7 +129,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         if (connectingRef.current !== channel.id) return;
 
         const userId = authState.user?.username || uuid.current;
-        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}`, 'ws');
+        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(authState.token)}`, 'ws');
         roomWs.current = new WebSocket(wsUrl);
 
         setVoiceStates({});

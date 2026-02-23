@@ -1,6 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query
 from database import get_db_connection, DB_NAME
-from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES
+from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES, check_channel_membership, check_server_membership, validate_upload, ALLOWED_CHAT_EXTS
 from state import lobby, rooms, VoiceRoom, broadcast_room_update, broadcast_user_list
 import sqlite3
 import json
@@ -27,15 +27,28 @@ async def get_voice_log(channel_id: str, token: str, limit: int = 50):
     try:
         conn = get_db_connection()
         c = conn.cursor()
+        # 1. Validate Token
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        conn.close()
+        # 2. Authorization: must be a member of this channel's server
+        if not check_channel_membership(user['id'], channel_id):
+            return {"status": "error", "message": "Erişim reddedildi."}
+        # 3. Fetch logs
+        conn = get_db_connection()
+        c = conn.cursor()
         c.execute(
             "SELECT user_id, action, timestamp FROM voice_logs WHERE channel_id = ? ORDER BY timestamp DESC LIMIT ?",
-            (channel_id, limit)
+            (channel_id, min(limit, 200))
         )
         rows = c.fetchall()
         conn.close()
         return {"status": "success", "logs": [dict(r) for r in rows]}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "Sunucu hatası"}
 
 @router.get("/channel/{channel_id}/messages")
 async def get_channel_messages(channel_id: str, token: str, before: int = None, limit: int = 100):
@@ -49,8 +62,13 @@ async def get_channel_messages(channel_id: str, token: str, before: int = None, 
         if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-            
-        # 2. Get Messages (with pagination)
+        conn.close()
+        # 2. Authorization: must be member of this channel's server
+        if not check_channel_membership(user['id'], channel_id):
+            return {"status": "error", "message": "Erişim reddedildi."}
+        conn = get_db_connection()
+        c = conn.cursor()
+        # 3. Get Messages (with pagination)
         if before:
             c.execute('''
                 SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type, 
@@ -130,7 +148,7 @@ async def get_channel_messages(channel_id: str, token: str, before: int = None, 
         conn.close()
         return {"status": "success", "messages": messages}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/chat/upload")
 async def chat_upload(token: str = Form(...), file: UploadFile = File(...)):
@@ -145,21 +163,27 @@ async def chat_upload(token: str = Form(...), file: UploadFile = File(...)):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
             
-        # 2. Save File
-        file_ext = file.filename.split('.')[-1]
-        filename = f"chat_{user['id']}_{uuid.uuid4().hex[:8]}.{file_ext}"
+        # 2. Read content + validate (size, extension, magic bytes)
+        content = await file.read()
+        is_valid, err_msg = validate_upload(content, file.filename, ALLOWED_CHAT_EXTS)
+        if not is_valid:
+            conn.close() # Close connection before returning
+            return {"status": "error", "message": err_msg}
+
+        # 3. Save File
+        ext = file.filename.rsplit('.', 1)[-1].lower()
+        filename = f"chat_{user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
         filepath = os.path.join("uploads", filename)
-        
         with open(filepath, "wb") as f:
-            f.write(await file.read())
+            f.write(content)
             
         url = f"/uploads/{filename}"
         
         # Determine type
         ftype = 'file'
-        if file_ext.lower() in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+        if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
             ftype = 'image'
-        elif file_ext.lower() in ['mp4', 'webm', 'mov']:
+        elif ext in ['mp4', 'webm', 'mov']:
             ftype = 'video'
             
         conn.close()
@@ -170,7 +194,7 @@ async def chat_upload(token: str = Form(...), file: UploadFile = File(...)):
             "name": file.filename
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/message/edit")
 async def edit_message(data: dict):
@@ -205,7 +229,7 @@ async def edit_message(data: dict):
         conn.close()
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/message/delete")
 async def delete_message(data: dict):
@@ -272,7 +296,7 @@ async def delete_message(data: dict):
         
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/utils/link-preview")
 async def link_preview(data: dict):
@@ -308,7 +332,7 @@ async def link_preview(data: dict):
                 "url": url
             }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- FAZ 3: CHAT ENRICHMENT ENDPOINTS ---
 
@@ -331,7 +355,17 @@ async def react_to_message(data: dict):
         if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        
+        # Authorization: must be member of the message's channel's server
+        # Fetch channel_id from message
+        c.execute("SELECT channel_id FROM channel_messages WHERE id = ?", (message_id,))
+        msg_row = c.fetchone()
+        conn.close()
+        if not msg_row:
+            return {"status": "error", "message": "Mesaj bulunamadı"}
+        if not check_channel_membership(user['id'], msg_row['channel_id']):
+            return {"status": "error", "message": "Erişim reddedildi."}
+        conn = get_db_connection()
+        c = conn.cursor()
         # Toggle: if already reacted, remove; otherwise add
         c.execute("SELECT id FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?",
                   (message_id, user['id'], emoji))
@@ -364,7 +398,7 @@ async def react_to_message(data: dict):
         conn.close()
         return {"status": "success", "action": action, "reactions": reactions, "message_id": message_id}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/message/pin")
 async def pin_message(data: dict):
@@ -408,7 +442,7 @@ async def pin_message(data: dict):
         
         return {"status": "success", "is_pinned": bool(new_pin)}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/channel/{channel_id}/pins")
 async def get_pinned_messages(channel_id: str, token: str):
@@ -418,10 +452,16 @@ async def get_pinned_messages(channel_id: str, token: str):
         c = conn.cursor()
         
         c.execute("SELECT id FROM users WHERE token = ?", (token,))
-        if not c.fetchone():
+        user = c.fetchone()
+        if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        
+        conn.close()
+        # Authorization: must be member of this channel's server
+        if not check_channel_membership(user['id'], channel_id):
+            return {"status": "error", "message": "Erişim reddedildi."}
+        conn = get_db_connection()
+        c = conn.cursor()
         c.execute('''
             SELECT cm.id, cm.content, cm.timestamp, u.username as sender
             FROM channel_messages cm
@@ -435,7 +475,7 @@ async def get_pinned_messages(channel_id: str, token: str):
         
         return {"status": "success", "pins": pins}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/channel/{channel_id}/search")
 async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
@@ -445,10 +485,16 @@ async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
         c = conn.cursor()
         
         c.execute("SELECT id FROM users WHERE token = ?", (token,))
-        if not c.fetchone():
+        user = c.fetchone()
+        if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        
+        conn.close()
+        # Authorization: must be member of this channel's server
+        if not check_channel_membership(user['id'], channel_id):
+            return {"status": "error", "message": "Erişim reddedildi."}
+        conn = get_db_connection()
+        c = conn.cursor()
         if not q or len(q) < 2:
             conn.close()
             return {"status": "error", "message": "Arama en az 2 karakter olmalı"}
@@ -467,12 +513,23 @@ async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
         
         return {"status": "success", "results": results, "count": len(results)}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 # --- WebSockets ---
 
 @router.websocket("/ws/lobby/{user_id}")
-async def lobby_endpoint(websocket: WebSocket, user_id: str):
+async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(default=None)):
+    # --- AUTH: Validate token before accepting ---
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT username FROM users WHERE token = ?", (token,))
+    db_user = c.fetchone()
+    conn.close()
+    if not db_user or db_user['username'] != user_id:
+        await websocket.close(code=4001)  # Unauthorized
+        log_event("SECURITY", f"WS Lobby rejected: claimed user_id={user_id}, token={token[:8] if token else 'None'}...")
+        return
+    # Auth passed — accept connection
     await websocket.accept()
     
     # De-duplicate: If user already connected, remove old connection
@@ -544,7 +601,18 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str):
 
 
 @router.websocket("/ws/room/{room_id}/{user_id}")
-async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str):
+async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token: str = Query(default=None)):
+    # --- AUTH: Validate token before accepting ---
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT username FROM users WHERE token = ?", (token,))
+    db_user = c.fetchone()
+    conn.close()
+    if not db_user or db_user['username'] != user_id:
+        await websocket.close(code=4001)  # Unauthorized
+        log_event("SECURITY", f"WS Room rejected: claimed user_id={user_id}, token={token[:8] if token else 'None'}...")
+        return
+    # Auth passed — accept connection
     await websocket.accept()
     
     # 1. Check if room exists in memory

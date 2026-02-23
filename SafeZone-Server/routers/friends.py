@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from models import DMSend
 from database import get_db_connection
-from utils import log_event
+from utils import log_event, safe_error
 from state import lobby
 import sqlite3
 import datetime
@@ -77,7 +77,7 @@ async def add_friend(data: dict):
         
         return {"status": "success", "message": "Arkadaşlık isteği gönderildi."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/friends/requests")
 async def get_friend_requests(data: dict):
@@ -105,7 +105,7 @@ async def get_friend_requests(data: dict):
         conn.close()
         return {"status": "success", "requests": requests}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/friends/respond")
 async def respond_friend_request(data: dict):
@@ -179,7 +179,7 @@ async def respond_friend_request(data: dict):
         conn.close()
         return {"status": "success", "message": msg}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/friends/remove")
 async def remove_friend(data: dict):
@@ -223,7 +223,7 @@ async def remove_friend(data: dict):
         return {"status": "success", "message": "Arkadaş kaldırıldı."}
         
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/friends")
 async def get_friends_data(token: str):
@@ -276,7 +276,7 @@ async def get_friends_data(token: str):
             "requests": { "incoming": requests_incoming, "outgoing": [] }
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/friends/list")
 async def list_friends(data: dict):
@@ -327,7 +327,7 @@ async def send_dm(dm: DMSend):
         return {"status": "success"}
     except Exception as e:
         print(e)
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/dm/history")
 async def get_dm_history(data: dict):
@@ -387,7 +387,7 @@ async def get_dm_history(data: dict):
         conn.close()
         return {"status": "success", "messages": messages}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/dm/edit")
 async def edit_dm(data: dict):
@@ -419,7 +419,7 @@ async def edit_dm(data: dict):
         
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/dm/delete")
 async def delete_dm(data: dict):
@@ -449,4 +449,4 @@ async def delete_dm(data: dict):
         
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)

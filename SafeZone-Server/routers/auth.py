@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from models import UserRegister, UserLogin, UserReset, AdminLogin
 from database import get_db_connection
-from utils import log_event
+from utils import log_event, rate_limit_check, safe_error
 from config import ADMIN_SECRET
 import bcrypt
 import secrets
@@ -11,7 +11,12 @@ import random
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register")
-async def register(user: UserRegister):
+async def register(user: UserRegister, request: Request):
+    # Rate limit: max 5 registrations per IP per 10 minutes
+    client_ip = request.client.host
+    allowed, err = rate_limit_check(client_ip, "register", max_attempts=5, window_seconds=600)
+    if not allowed:
+        return {"status": "error", "message": err}
     try:
         log_event("AUTH", f"Register attempt: {user.username} ({user.email})")
         conn = get_db_connection()
@@ -61,11 +66,15 @@ async def register(user: UserRegister):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        log_event("ERROR", f"Register failed: {str(e)}")
-        return {"status": "error", "message": f"Server Error: {str(e)}"}
+        return safe_error(e, "register")
 
 @router.post("/login")
-async def login(user: UserLogin):
+async def login(user: UserLogin, request: Request):
+    # Rate limit: max 10 login attempts per IP per minute
+    client_ip = request.client.host
+    allowed, err = rate_limit_check(client_ip, "login", max_attempts=10, window_seconds=60)
+    if not allowed:
+        return {"status": "error", "message": err}
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -102,7 +111,7 @@ async def login(user: UserLogin):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"status": "error", "message": f"Login Error: {str(e)}"}
+        return safe_error(e, "login")
 
 @router.post("/admin-login")
 async def admin_login(data: AdminLogin):
@@ -143,7 +152,7 @@ async def admin_login(data: AdminLogin):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"status": "error", "message": f"Admin Login Error: {str(e)}"}
+        return safe_error(e, "admin-login")
 
 @router.post("/verify")
 async def verify_token(data: dict):
@@ -176,7 +185,7 @@ async def verify_token(data: dict):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}
+        return safe_error(e, "verify")
 
 @router.post("/reset")
 async def reset_password(data: UserReset):
@@ -209,4 +218,4 @@ async def reset_password(data: UserReset):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}
+        return safe_error(e, "reset")

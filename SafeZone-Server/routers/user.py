@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form
 from database import get_db_connection
+from utils import validate_upload, ALLOWED_IMAGE_EXTS, safe_error
 import uuid
 import os
 import sqlite3
@@ -53,7 +54,7 @@ async def update_profile(data: dict):
             }
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/profile/avatar")
 async def upload_avatar(token: str = Form(...), file: UploadFile = File(...)):
@@ -68,13 +69,20 @@ async def upload_avatar(token: str = Form(...), file: UploadFile = File(...)):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
             
-        # 2. Save File
-        file_ext = file.filename.split('.')[-1]
-        filename = f"{user['id']}_{uuid.uuid4().hex[:8]}.{file_ext}"
+        # 2. Read content + validate (size, extension, magic bytes)
+        content = await file.read()
+        is_valid, err_msg = validate_upload(content, file.filename, ALLOWED_IMAGE_EXTS)
+        if not is_valid:
+            conn.close()
+            return {"status": "error", "message": err_msg}
+
+        # 3. Save File
+        ext = file.filename.rsplit('.', 1)[-1].lower()
+        filename = f"{user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
         filepath = os.path.join("uploads", filename)
         
         with open(filepath, "wb") as f:
-            f.write(await file.read())
+            f.write(content)
             
         # 3. Update DB
         avatar_url = f"/uploads/{filename}"
@@ -88,7 +96,7 @@ async def upload_avatar(token: str = Form(...), file: UploadFile = File(...)):
         return {"status": "success", "avatar_url": updated_user['avatar_url']}
         
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/status")
 async def update_status(data: dict):
@@ -115,7 +123,7 @@ async def update_status(data: dict):
         
         return {"status": "success", "user_status": new_status}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.get("/profile/{username}")
 async def get_user_profile(username: str, token: str):
@@ -154,4 +162,4 @@ async def get_user_profile(username: str, token: str):
         conn.close()
         return {"status": "success", "profile": profile}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)

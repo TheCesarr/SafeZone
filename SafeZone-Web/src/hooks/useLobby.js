@@ -20,7 +20,7 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
 
         if (lobbyWs.current) lobbyWs.current.close();
         // Use username for Lobby ID so backend updates the correct user row
-        const wsUrl = getUrl(`/ws/lobby/${authState.user.username}`, 'ws');
+        const wsUrl = getUrl(`/ws/lobby/${authState.user.username}?token=${encodeURIComponent(authState.token)}`, 'ws');
         lobbyWs.current = new WebSocket(wsUrl);
 
         lobbyWs.current.onmessage = (event) => {

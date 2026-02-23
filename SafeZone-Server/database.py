@@ -10,6 +10,40 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def migrate_db():
+    """Automatically adds missing columns to existing tables for backwards compatibility"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    columns_to_check = {
+        "users": [
+            ("avatar_url", "TEXT"),
+            ("avatar_color", "TEXT DEFAULT '#5865F2'"),
+            ("status", "TEXT DEFAULT 'online'"),
+            ("is_sysadmin", "BOOLEAN DEFAULT 0"),
+            ("recovery_pin", "TEXT")
+        ],
+        "servers": [
+            ("icon_url", "TEXT"),
+            ("description", "TEXT DEFAULT ''"),
+            ("deleted_at", "TIMESTAMP")
+        ]
+    }
+    
+    for table, columns in columns_to_check.items():
+        try:
+            c.execute(f"PRAGMA table_info({table})")
+            existing_cols = [row['name'] for row in c.fetchall()]
+            for col_name, col_def in columns:
+                if col_name not in existing_cols:
+                    print(f"[Migration] Adding {col_name} to {table} table...")
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
+        except Exception as e:
+            print(f"[Migration] Error on {table}: {e}")
+            
+    conn.commit()
+    conn.close()
+
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
@@ -213,6 +247,9 @@ def init_db():
 
     conn.commit()
     conn.close()
+    
+    # Run auto migrations for missing columns
+    migrate_db()
 
 def init_admin():
     """Ensure ADMIN#0001 user exists."""

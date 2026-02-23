@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from models import ChannelCreate, ChannelRename, ChannelDelete
 from database import get_db_connection
-from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_CHANNELS
+from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_CHANNELS, safe_error
 from state import broadcast_lobby_update, broadcast_room_update
 import uuid
 import sqlite3
@@ -45,7 +45,7 @@ async def create_channel(data: ChannelCreate):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/rename")
 async def rename_channel(data: ChannelRename):
@@ -79,7 +79,7 @@ async def rename_channel(data: ChannelRename):
         await broadcast_room_update()
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/delete")
 async def delete_channel(data: ChannelDelete):
@@ -106,7 +106,7 @@ async def delete_channel(data: ChannelDelete):
         await broadcast_lobby_update()
         return {"status":"success"}
     except Exception as e:
-        return {"status":"error", "message":str(e)}
+        return safe_error(e, "delete_channel")
 
 # --- FAZ 4: CATEGORY MANAGEMENT ---
 
@@ -147,7 +147,7 @@ async def create_category(data: dict):
         
         return {"status": "success", "category_id": cat_id, "position": new_pos}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/category/rename")
 async def rename_category(data: dict):
@@ -183,7 +183,7 @@ async def rename_category(data: dict):
         await broadcast_lobby_update()
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/category/delete")
 async def delete_category(data: dict):
@@ -220,7 +220,7 @@ async def delete_category(data: dict):
         await broadcast_lobby_update()
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
 
 @router.post("/reorder")
 async def reorder_channels(data: dict):
@@ -253,4 +253,4 @@ async def reorder_channels(data: dict):
         await broadcast_lobby_update()
         return {"status": "success"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return safe_error(e)
