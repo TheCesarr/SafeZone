@@ -119,7 +119,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                                 }}></div>
                             </div>
                             <div>
-                                <div style={{ fontWeight: '500', color: colors.text }}>
+                                <div style={{ fontWeight: '500', color: member.role_color || colors.text, transition: 'color 0.2s' }}>
                                     {member.display_name || member.username}
                                 </div>
                                 {member.display_name && (
@@ -179,7 +179,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontWeight: '500', color: colors.text }}>
+                                <div style={{ fontWeight: '500', color: member.role_color || colors.text, transition: 'color 0.2s' }}>
                                     {member.display_name || member.username}
                                 </div>
                             </div>

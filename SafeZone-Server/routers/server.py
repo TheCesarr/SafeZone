@@ -190,9 +190,11 @@ async def get_server_members(server_id: str, token: str):
             m['roles'] = [r['id'] for r in my_roles] # Return list of role IDs
             m['highest_role'] = {
                 "name": highest_role['name'] if highest_role else ("Owner" if m['legacy_role'] == 'owner' else "Member"),
-                "color": highest_role['color'] if highest_role else "#99AAB5", # Default Gray
+                "color": highest_role['color'] if highest_role else "#99AAB5",
                 "position": highest_role['position'] if highest_role else 0
             }
+            # Flat convenience field for frontend role color lookup
+            m['role_color'] = highest_role['color'] if highest_role else None
             enriched_members.append(m)
             
         conn.close()

@@ -272,10 +272,40 @@ textarea:focus {
   border-radius: 4px;
   margin: 0 -8px;
   padding: 4px 8px;
+  animation: msgIn 0.18s ease-out forwards;
 }
 
 .message-row:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Channel Unread Badge --- */
+.unread-badge {
+  animation: badgePop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes badgePop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* --- Typing Dots Animation --- */

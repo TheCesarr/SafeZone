@@ -188,8 +188,21 @@ const ChannelList = ({
                                     }}
                                 >
                                     <span style={{ flexShrink: 0 }}>{ch.type === 'voice' ? '🔊' : '💬'}</span>
-                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: unreadChannels?.has(ch.id) ? 'bold' : 'normal', color: unreadChannels?.has(ch.id) ? '#fff' : 'inherit' }}>{ch.name}</span>
-                                    {unreadChannels?.has(ch.id) && <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fff', marginLeft: 'auto' }}></div>}
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, fontWeight: unreadChannels?.has(ch.id) ? 'bold' : 'normal', color: unreadChannels?.has(ch.id) ? '#fff' : 'inherit' }}>{ch.name}</span>
+                                    {unreadChannels?.has(ch.id) && (() => {
+                                        const count = typeof unreadChannels.get === 'function' ? unreadChannels.get(ch.id) : 1;
+                                        return (
+                                            <div style={{
+                                                minWidth: '18px', height: '18px', borderRadius: '9px',
+                                                backgroundColor: '#ED4245', color: '#fff',
+                                                fontSize: '11px', fontWeight: 'bold',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                padding: '0 4px', marginLeft: 'auto', flexShrink: 0
+                                            }}>
+                                                {count > 99 ? '99+' : count}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                                 {/* ACTIVE VOICE USERS AVATARS (Always from Lobby RoomDetails) */}
                                 {ch.type === 'voice' && roomDetails[ch.id] && roomDetails[ch.id].length > 0 && (

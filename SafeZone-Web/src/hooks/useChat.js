@@ -3,6 +3,8 @@ import { getUrl } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 import toast from '../utils/toast';
 
+const PAGE_SIZE = 50;
+
 // v2: Added connectToChannel and message handling
 export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const currentUsername = authState.user?.username || '';
@@ -18,9 +20,14 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const [editText, setEditText] = useState("");
     const typingTimeouts = useRef({});
 
+    // Infinite scroll state
+    const [hasMore, setHasMore] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const currentChannelId = useRef(null);
+
     // --- CONNECTION ---
     const connectToChannel = (channel) => {
-        if (!channel || channel.type === 'voice') return; // Voice handles its own chat in roomWs (mostly)
+        if (!channel || channel.type === 'voice') return;
 
         if (chatWs.current) chatWs.current.close();
         const userId = authState.user?.username || uuid.current;
@@ -43,7 +50,6 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
                 const myUsername = authState.user?.username || '';
                 if (myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)) {
                     SoundManager.playMention();
-                    // Electron push notification (only when window is not focused)
                     if (window.SAFEZONE_API?.notify) {
                         window.SAFEZONE_API.notify(
                             `@${msg.sender} seni mention etti`,
@@ -58,30 +64,22 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
                 attachment_url: msg.attachment_url,
                 attachment_type: msg.attachment_type,
                 attachment_name: msg.attachment_name,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                _new: true // flag for animation
             }]);
         } else if (msg.type === 'history') {
-            setMessages(msg.messages || []);
+            const msgs = msg.messages || [];
+            setMessages(msgs);
+            setHasMore(msgs.length >= PAGE_SIZE);
         } else if (msg.type === 'typing') {
             setTypingUsers(prev => {
                 const newSet = new Set(prev);
                 newSet.add(msg.sender);
-
-                // Clear existing timeout for this user
-                if (typingTimeouts.current[msg.sender]) {
-                    clearTimeout(typingTimeouts.current[msg.sender]);
-                }
-
-                // Set new timeout
+                if (typingTimeouts.current[msg.sender]) clearTimeout(typingTimeouts.current[msg.sender]);
                 typingTimeouts.current[msg.sender] = setTimeout(() => {
-                    setTypingUsers(current => {
-                        const updated = new Set(current);
-                        updated.delete(msg.sender);
-                        return updated;
-                    });
+                    setTypingUsers(current => { const u = new Set(current); u.delete(msg.sender); return u; });
                     delete typingTimeouts.current[msg.sender];
                 }, 3000);
-
                 return newSet;
             });
         } else if (msg.type === 'message_deleted') {
@@ -91,13 +89,36 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
     const fetchChannelMessages = async (channelId) => {
         if (!authState.token) return;
+        currentChannelId.current = channelId;
         try {
-            const res = await fetch(`${getUrl(`/channel/${channelId}/messages`)}?token=${authState.token}`);
+            const res = await fetch(`${getUrl(`/channel/${channelId}/messages`)}?token=${authState.token}&limit=${PAGE_SIZE}`);
             const data = await res.json();
             if (data.status === 'success') {
                 setMessages(data.messages);
+                setHasMore(data.messages.length >= PAGE_SIZE);
             }
         } catch (e) { console.error(e); }
+    }
+
+    // Infinite scroll: load older messages
+    const loadMoreMessages = async () => {
+        const channelId = currentChannelId.current;
+        if (!channelId || isLoadingMore || !hasMore) return;
+        setIsLoadingMore(true);
+        try {
+            const firstMsg = messages[0];
+            const beforeId = firstMsg?.id;
+            const url = `${getUrl(`/channel/${channelId}/messages`)}?token=${authState.token}&limit=${PAGE_SIZE}${beforeId ? `&before_id=${beforeId}` : ''}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.status === 'success' && data.messages.length > 0) {
+                setMessages(prev => [...data.messages, ...prev]);
+                setHasMore(data.messages.length >= PAGE_SIZE);
+            } else {
+                setHasMore(false);
+            }
+        } catch (e) { console.error(e); }
+        finally { setIsLoadingMore(false); }
     }
 
     // --- ACTIONS ---
@@ -162,16 +183,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
     // --- EDIT / DELETE ---
     const handleMessageContextMenu = (e, msg) => {
-        console.log("[useChat] Context Menu Check:", {
-            sender: msg.sender,
-            me: authState.user.username,
-            isAdmin: authState.user.is_sysadmin
-        });
-
-        if (msg.sender !== authState.user.username && !authState.user.is_sysadmin) {
-            console.log("[useChat] Context Menu BLOCKED");
-            return;
-        }
+        if (msg.sender !== authState.user.username && !authState.user.is_sysadmin) return;
         e.preventDefault();
         setMessageContextMenu({ x: e.pageX, y: e.pageY, msg });
     }
@@ -193,7 +205,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const startEditing = () => {
         setEditingMessageId(messageContextMenu.msg.id);
         setEditText(messageContextMenu.msg.content || messageContextMenu.msg.text || "");
-        setMessageContextMenu(null); // Close menu
+        setMessageContextMenu(null);
     }
 
     const submitEdit = async () => {
@@ -218,9 +230,14 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         editingMessageId, setEditingMessageId,
         editText, setEditText,
 
+        // Infinite scroll
+        hasMore,
+        isLoadingMore,
+        loadMoreMessages,
+
         connectToChannel,
         fetchChannelMessages,
-        handleIncomingMessage, // Expose for useWebRTC
+        handleIncomingMessage,
 
         handleFileSelect,
         handleTyping,

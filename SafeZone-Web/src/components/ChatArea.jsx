@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { getUrl } from '../utils/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import LinkPreview from './LinkPreview';
+import ContextMenu from './ContextMenus';
+import MediaEmbed from './MediaEmbed';
 
 const ChatArea = ({
     selectedChannel,
@@ -26,26 +27,76 @@ const ChatArea = ({
     setEditText,
     submitEdit,
     handleMessageContextMenu,
-    onlineMembers = [], // For @mention autocomplete
-    colors = {}
+    onlineMembers = [],
+    colors = {},
+    loadMoreMessages,   // infinite scroll callback
+    hasMore = false,    // are there older messages?
+    isLoadingMore = false,
+    serverMembers = [], // for role color lookup
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
     const messagesEndRef = useRef(null);
-    const [mentionQuery, setMentionQuery] = React.useState(null); // '@' + typed text
+    const scrollContainerRef = useRef(null);
+    const [mentionQuery, setMentionQuery] = React.useState(null);
     const [mentionSuggestions, setMentionSuggestions] = React.useState([]);
+    const prevScrollHeight = useRef(0);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
 
+    // Scroll bottom on new incoming messages (but not when loading older)
+    const prevMsgCount = useRef(0);
     React.useEffect(() => {
-        scrollToBottom();
-    }, [currentMessages, typingUsers, attachment]); // Scroll on new messages, typing, or attachment preview
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+        // Only scroll to bottom if near bottom or first load
+        if (isNearBottom || prevMsgCount.current === 0) {
+            scrollToBottom();
+        } else if (currentMessages.length > prevMsgCount.current) {
+            // Older messages loaded: restore scroll position
+            const added = currentMessages.length - prevMsgCount.current;
+            container.scrollTop = container.scrollHeight - prevScrollHeight.current;
+        }
+        prevMsgCount.current = currentMessages.length;
+    }, [currentMessages, typingUsers]);
+
+    // Infinite scroll: detect scroll to top
+    const handleScroll = useCallback(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        if (container.scrollTop < 80 && hasMore && !isLoadingMore && loadMoreMessages) {
+            prevScrollHeight.current = container.scrollHeight;
+            loadMoreMessages();
+        }
+    }, [hasMore, isLoadingMore, loadMoreMessages]);
+
+    // Role color helper
+    const getRoleColor = useCallback((username) => {
+        const member = serverMembers.find(m => m.username === username);
+        return member?.role_color || null;
+    }, [serverMembers]);
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-            <div style={{ flexGrow: 1, padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                style={{ flexGrow: 1, padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}
+            >
+                {/* Infinite scroll loading indicator */}
+                {isLoadingMore && (
+                    <div style={{ textAlign: 'center', padding: '8px', color: colors?.textMuted || '#888', fontSize: '12px' }}>
+                        ⏳ Eski mesajlar yükleniyor...
+                    </div>
+                )}
+                {hasMore && !isLoadingMore && (
+                    <div style={{ textAlign: 'center', padding: '4px', color: colors?.textMuted || '#666', fontSize: '11px' }}>
+                        ↑ Daha fazla mesaj için yukarı kaydırın
+                    </div>
+                )}
                 {currentMessages.map((msg, i) => {
                     const sender = typeof msg === 'string' ? msg.split(': ')[0] : (selectedDM ? msg.sender : msg.sender);
                     const text = (typeof msg === 'string' ? msg.split(': ').slice(1).join(': ') : (selectedDM ? msg.content : (msg.content || msg.text))) || "";
@@ -231,7 +282,7 @@ const ChatArea = ({
                                 {(() => {
                                     const urlMatch = text.match(/(https?:\/\/[^\s]+)/);
                                     if (urlMatch && !msg.attachment_url) {
-                                        return <LinkPreview url={urlMatch[0]} />;
+                                        return <MediaEmbed url={urlMatch[0]} />;
                                     }
                                     return null;
                                 })()}

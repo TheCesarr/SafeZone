@@ -1,24 +1,35 @@
 import { useState, useCallback } from 'react';
 
 export const useUnread = () => {
-    const [unreadChannels, setUnreadChannels] = useState(new Set());
+    // Map<channelId, count> for per-channel unread counts
+    const [unreadChannels, setUnreadChannels] = useState(new Map());
     const [unreadDMs, setUnreadDMs] = useState(new Set());
 
-    const markChannelUnread = useCallback((channelId) => {
+    const incrementChannelUnread = useCallback((channelId) => {
+        if (!channelId) return;
         setUnreadChannels(prev => {
-            const next = new Set(prev);
-            next.add(channelId);
+            const next = new Map(prev);
+            next.set(channelId, (next.get(channelId) || 0) + 1);
             return next;
         });
     }, []);
 
     const markChannelRead = useCallback((channelId) => {
         setUnreadChannels(prev => {
-            const next = new Set(prev);
+            const next = new Map(prev);
             next.delete(channelId);
             return next;
         });
     }, []);
+
+    // Legacy: check if channel has any unread (used in ChannelList)
+    const hasUnread = useCallback((channelId) => {
+        return unreadChannels.has(channelId);
+    }, [unreadChannels]);
+
+    const getUnreadCount = useCallback((channelId) => {
+        return unreadChannels.get(channelId) || 0;
+    }, [unreadChannels]);
 
     const markDMUnread = useCallback((username) => {
         setUnreadDMs(prev => {
@@ -37,10 +48,13 @@ export const useUnread = () => {
     }, []);
 
     return {
-        unreadChannels,
-        unreadDMs,
-        markChannelUnread,
+        unreadChannels,    // Map<channelId, count>
+        unreadDMs,         // Set<username>
+        incrementChannelUnread,
         markChannelRead,
+        markChannelUnread: incrementChannelUnread, // backwards compat alias
+        hasUnread,
+        getUnreadCount,
         markDMUnread,
         markDMRead
     };

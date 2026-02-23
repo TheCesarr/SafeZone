@@ -71,9 +71,14 @@ function App() {
     unread.markDMUnread(sender);
   });
 
+  const selectedChannelRef = useRef(null); // Track selected channel for unread updates
+
   // Chat & Voice Hooks (Interconnected)
   const chat = useChat(authState, uuid, chatWs, roomWs, () => {
-    // onUnreadMessage logic...
+    // Increment unread count for the channel that sent the message
+    if (selectedChannelRef.current) {
+      unread.incrementChannelUnread(selectedChannelRef.current.id);
+    }
   });
   const webrtc = useWebRTC(authState, uuid, roomWs, chat.handleIncomingMessage, selectedInputId, selectedOutputId, audioSettings);
 
@@ -219,6 +224,10 @@ function App() {
   // Handle Channel Selection & Connection binding
   useEffect(() => {
     if (serverData.selectedChannel) {
+      // Keep ref in sync for unread callback
+      selectedChannelRef.current = serverData.selectedChannel;
+      // Mark channel as read when opening it
+      unread.markChannelRead(serverData.selectedChannel.id);
       if (serverData.selectedChannel.type === 'voice') {
         webrtc.connectToRoom(serverData.selectedChannel);
       } else {
@@ -552,6 +561,10 @@ function App() {
                 setEditText={chat.setEditText}
                 submitEdit={chat.submitEdit}
                 onlineMembers={serverData.serverMembers || []}
+                serverMembers={serverData.serverMembers || []}
+                loadMoreMessages={chat.loadMoreMessages}
+                hasMore={chat.hasMore}
+                isLoadingMore={chat.isLoadingMore}
               />
 
               {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}
