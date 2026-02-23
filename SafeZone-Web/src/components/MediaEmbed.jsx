@@ -4,13 +4,14 @@ import { getUrl } from '../utils/api';
 const MediaEmbed = ({ url }) => {
     const [previewData, setPreviewData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [mediaType, setMediaType] = useState('link'); // 'image', 'video', 'youtube', 'link'
+    const [mediaType, setMediaType] = useState('link');
+    const [ytHovered, setYtHovered] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
 
-        // 1. YouTube Detection
+        // 1. YouTube Detection → thumbnail mode (no iframe = no Error 153)
         const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
         const ytMatch = url.match(ytRegex);
         if (ytMatch && ytMatch[1]) {
@@ -59,11 +60,10 @@ const MediaEmbed = ({ url }) => {
         };
 
         fetchPreview();
-
         return () => { isMounted = false; };
     }, [url]);
 
-    if (loading) return null; // Or a subtle skeleton
+    if (loading) return null;
     if (!previewData && mediaType === 'link') return null;
 
     const embedStyle = {
@@ -74,18 +74,53 @@ const MediaEmbed = ({ url }) => {
         border: '1px solid rgba(255,255,255,0.06)'
     };
 
+    // YouTube: thumbnail + overlay play button → opens YouTube on click
     if (mediaType === 'youtube') {
+        const { videoId } = previewData;
+        const thumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
         return (
-            <div style={{ ...embedStyle, width: '400px', height: '225px' }}>
-                <iframe
-                    width="100%"
-                    height="100%"
-                    src={`https://www.youtube.com/embed/${previewData.videoId}?autoplay=0`}
-                    title="YouTube video player"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                ></iframe>
+            <div style={{ ...embedStyle, width: '400px', position: 'relative', cursor: 'pointer' }}
+                onMouseEnter={() => setYtHovered(true)}
+                onMouseLeave={() => setYtHovered(false)}
+                onClick={() => window.open(ytUrl, '_blank')}
+            >
+                {/* Thumbnail */}
+                <img
+                    src={thumb}
+                    alt="YouTube video"
+                    style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover' }}
+                    onError={(e) => { e.target.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`; }}
+                />
+                {/* Dark overlay on hover */}
+                <div style={{
+                    position: 'absolute', inset: 0,
+                    background: ytHovered ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.15)',
+                    transition: 'background 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexDirection: 'column', gap: '8px'
+                }}>
+                    {/* Play button */}
+                    <div style={{
+                        width: '56px', height: '56px', borderRadius: '50%',
+                        background: ytHovered ? '#FF0000' : 'rgba(0,0,0,0.7)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.2s',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
+                    }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+                            <polygon points="5,3 19,12 5,21" />
+                        </svg>
+                    </div>
+                    {/* "YouTube'da izle" label */}
+                    <div style={{
+                        fontSize: '12px', color: 'rgba(255,255,255,0.85)',
+                        background: 'rgba(0,0,0,0.5)', padding: '3px 8px',
+                        borderRadius: '4px', backdropFilter: 'blur(4px)'
+                    }}>
+                        ▶ YouTube'da izle
+                    </div>
+                </div>
             </div>
         );
     }
@@ -98,7 +133,7 @@ const MediaEmbed = ({ url }) => {
                         src={previewData.src}
                         alt="embed"
                         style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', display: 'block' }}
-                        onError={(e) => e.target.style.display = 'none'} // Hide on error
+                        onError={(e) => e.target.style.display = 'none'}
                     />
                 </a>
             </div>
