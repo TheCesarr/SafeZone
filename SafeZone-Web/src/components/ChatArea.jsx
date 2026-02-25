@@ -36,7 +36,11 @@ const ChatArea = ({
     isLoadingMore = false,
     serverMembers = [], // for role color lookup
     replyingTo = null,
-    setReplyingTo
+    setReplyingTo,
+    activeEmojiPickerId = null,
+    setActiveEmojiPickerId,
+    emojiPickerPosition = null,
+    setEmojiPickerPosition
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
@@ -45,8 +49,6 @@ const ChatArea = ({
     const [mentionQuery, setMentionQuery] = React.useState(null);
     const [mentionSuggestions, setMentionSuggestions] = React.useState([]);
     const [selectedUserForProfile, setSelectedUserForProfile] = React.useState(null);
-    const [activeEmojiPickerId, setActiveEmojiPickerId] = React.useState(null);
-    const [emojiPickerPosition, setEmojiPickerPosition] = React.useState(null);
     const prevScrollHeight = useRef(0);
 
     const scrollToBottom = () => {
@@ -475,26 +477,6 @@ const ChatArea = ({
                         </div>
                     );
                 })}
-                {contextMenu && contextMenu.type === 'message' && (
-                    <MessageContextMenu
-                        contextMenu={contextMenu}
-                        onDelete={handleDeleteMessage}
-                        onEdit={(msg) => {
-                            setEditingMessageId(msg.id);
-                            setEditText(msg.text);
-                            setContextMenu(null);
-                        }}
-                        onReply={(msg) => {
-                            setReplyingTo({ id: msg.id, sender: msg.sender, text: msg.text });
-                            setContextMenu(null);
-                        }}
-                        onReactClick={(context) => {
-                            setActiveEmojiPickerId(context.msg.id);
-                            setEmojiPickerPosition({ x: context.x, y: context.y });
-                            setContextMenu(null);
-                        }}
-                    />
-                )}
                 <div ref={messagesEndRef} />
             </div>
 

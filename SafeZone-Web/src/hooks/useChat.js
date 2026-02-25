@@ -20,6 +20,10 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const [editText, setEditText] = useState("");
     const typingTimeouts = useRef({});
 
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [activeEmojiPickerId, setActiveEmojiPickerId] = useState(null);
+    const [emojiPickerPosition, setEmojiPickerPosition] = useState(null);
+
     // Infinite scroll state
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -247,6 +251,9 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         messageContextMenu, setMessageContextMenu,
         editingMessageId, setEditingMessageId,
         editText, setEditText,
+        replyingTo, setReplyingTo,
+        activeEmojiPickerId, setActiveEmojiPickerId,
+        emojiPickerPosition, setEmojiPickerPosition,
 
         // Infinite scroll
         hasMore,

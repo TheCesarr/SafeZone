@@ -596,6 +596,12 @@ function App() {
                 loadMoreMessages={chat.loadMoreMessages}
                 hasMore={chat.hasMore}
                 isLoadingMore={chat.isLoadingMore}
+                replyingTo={chat.replyingTo}
+                setReplyingTo={chat.setReplyingTo}
+                activeEmojiPickerId={chat.activeEmojiPickerId}
+                setActiveEmojiPickerId={chat.setActiveEmojiPickerId}
+                emojiPickerPosition={chat.emojiPickerPosition}
+                setEmojiPickerPosition={chat.setEmojiPickerPosition}
               />
 
               {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}
@@ -796,6 +802,15 @@ function App() {
         currentUser={authState.user}
         onDelete={chat.handleDeleteMessage}
         onEdit={chat.startEditing}
+        onReply={(msg) => {
+          chat.setReplyingTo({ id: msg.id, sender: msg.sender, text: msg.text });
+          chat.setMessageContextMenu(null);
+        }}
+        onReactClick={(context) => {
+          chat.setActiveEmojiPickerId(context.msg.id);
+          chat.setEmojiPickerPosition({ x: context.x, y: context.y });
+          chat.setMessageContextMenu(null);
+        }}
       />
 
       {/* Persistent Screen Share Overlay */}
