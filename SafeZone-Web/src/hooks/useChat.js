@@ -48,11 +48,21 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
                 // @Mention detection
                 const myUsername = authState.user?.username || '';
-                if (myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)) {
+                const isMentioned = myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`);
+
+                if (isMentioned) {
                     SoundManager.playMention();
                     if (window.SAFEZONE_API?.notify) {
                         window.SAFEZONE_API.notify(
                             `@${msg.sender} seni mention etti`,
+                            msg.text.length > 80 ? msg.text.slice(0, 80) + '…' : msg.text
+                        );
+                    }
+                } else {
+                    // General message notification (if not focused)
+                    if (window.SAFEZONE_API?.notify && document.hidden) {
+                        window.SAFEZONE_API.notify(
+                            `Yeni mesaj: ${msg.sender}`,
                             msg.text.length > 80 ? msg.text.slice(0, 80) + '…' : msg.text
                         );
                     }
@@ -84,6 +94,13 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
             });
         } else if (msg.type === 'message_deleted') {
             setMessages(prev => prev.filter(m => m.id !== msg.message_id));
+        } else if (msg.type === 'message_react') {
+            setMessages(prev => prev.map(m => {
+                if (m.id === msg.message_id) {
+                    return { ...m, reactions: msg.reactions };
+                }
+                return m;
+            }));
         }
     }
 
@@ -158,17 +175,18 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         }
     }
 
-    const sendChatMessage = () => {
-        if (!inputText && !attachment) return;
+    const sendChatMessage = (text = inputText, replyToId = null) => {
+        if (!text && !attachment) return;
 
         const msg = {
             type: 'chat',
-            text: inputText,
+            text: text,
             sender: authState.user.username,
             uuid: authState.user?.username || uuid.current,
             attachment_url: attachment?.url,
             attachment_type: attachment?.type,
-            attachment_name: attachment?.name
+            attachment_name: attachment?.name,
+            reply_to_id: replyToId
         }
 
         if (chatWs.current && chatWs.current.readyState === WebSocket.OPEN) {

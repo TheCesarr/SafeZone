@@ -4,6 +4,7 @@ from utils import validate_upload, ALLOWED_IMAGE_EXTS, safe_error
 import uuid
 import os
 import sqlite3
+from state import broadcast_room_update
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -43,6 +44,8 @@ async def update_profile(data: dict):
         c.execute("SELECT username, display_name, avatar_color, avatar_url FROM users WHERE id = ?", (user['id'],))
         updated_user = c.fetchone()
         conn.close()
+        
+        await broadcast_room_update()
         
         return {
             "status": "success", 
@@ -161,5 +164,77 @@ async def get_user_profile(username: str, token: str):
         
         conn.close()
         return {"status": "success", "profile": profile}
+    except Exception as e:
+        return safe_error(e)
+
+@router.post("/avatar")
+async def upload_avatar(token: str = Form(...), file: UploadFile = File(...)):
+    from utils import validate_upload, ALLOWED_IMAGE_EXTS
+    import os
+    import time
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id, username FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Geçersiz token"}
+            
+        validated_file = await validate_upload(file, ALLOWED_IMAGE_EXTS)
+        
+        upload_dir = "uploads/avatars"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        ext = validated_file.filename.split('.')[-1]
+        filename = f"avatar_{user['id']}_{int(time.time())}.{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        
+        with open(filepath, "wb") as buffer:
+            buffer.write(await validated_file.read())
+            
+        avatar_url = f"/uploads/avatars/{filename}"
+        
+        c.execute("UPDATE users SET avatar_url = ? WHERE id = ?", (avatar_url, user['id']))
+        conn.commit()
+        conn.close()
+        
+        await broadcast_room_update()
+        
+        return {"status": "success", "avatar_url": avatar_url}
+        
+    except Exception as e:
+        return safe_error(e)
+
+from pydantic import BaseModel
+class StatusUpdateParam(BaseModel):
+    token: str
+    preferred_status: str
+    custom_status: str = None
+
+@router.put("/status")
+async def update_status(data: StatusUpdateParam):
+    try:
+        if data.preferred_status not in ['online', 'idle', 'dnd', 'invisible']:
+            return {"status": "error", "message": "Geçersiz durum"}
+            
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute("SELECT id FROM users WHERE token = ?", (data.token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Geçersiz token"}
+            
+        c.execute("UPDATE users SET preferred_status = ?, custom_status = ? WHERE id = ?",
+                 (data.preferred_status, data.custom_status, user['id']))
+        conn.commit()
+        conn.close()
+        
+        await broadcast_room_update()
+        
+        return {"status": "success"}
     except Exception as e:
         return safe_error(e)

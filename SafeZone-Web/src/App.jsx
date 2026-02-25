@@ -57,9 +57,31 @@ function App() {
     autoGainControl: true
   });
 
-  // --- 2. LOGIC HOOKS ---
   const serverData = useServerData(authState);
   const unread = useUnread();
+
+  // Function to dynamically enrich local user state from global lobby updates
+  const updateGlobalUsers = (usersArray) => {
+    if (!usersArray || !serverData.serverMembers) return;
+    serverData.setServerMembers(prev => {
+      let changed = false;
+      const next = prev.map(m => {
+        const up = usersArray.find(u => u.username === m.username);
+        if (up) {
+          if (m.avatar_url !== up.avatar_url ||
+            m.display_name !== up.display_name ||
+            m.avatar_color !== up.avatar_color ||
+            m.status !== up.status ||
+            m.custom_status !== up.custom_status) {
+            changed = true;
+            return { ...m, ...up };
+          }
+        }
+        return m;
+      });
+      return changed ? next : prev;
+    });
+  };
 
   // Admin View State
   const [adminView, setAdminView] = useState(true);
@@ -69,7 +91,7 @@ function App() {
     serverData.fetchFriends();
   }, (sender) => {
     unread.markDMUnread(sender);
-  });
+  }, updateGlobalUsers);
 
   const selectedChannelRef = useRef(null); // Track selected channel for unread updates
 
@@ -284,10 +306,19 @@ function App() {
 
   // Volume Control Helpers
   const handleRemoteVolume = (userId, vol) => {
+    // 1. Web Audio Api native amplification (Scale > 1.0)
+    const pc = webrtc.peerConnections.current?.[userId];
+    if (pc && pc._gainNode) {
+      pc._gainNode.gain.value = vol;
+      vol = 1.0; // Force HTML bounds down to 1 since we're amplifying at the source
+    }
+
+    // 2. Adjust remaining HTML targets safely (clamped to 1.0 max)
     if (!webrtc.remoteAudioRefs.current) return;
+    const safeVol = Math.max(0, Math.min(1, vol));
     const audios = webrtc.remoteAudioRefs.current[userId];
-    if (Array.isArray(audios)) audios.forEach(a => { if (a) a.volume = vol });
-    else if (audios) audios.volume = vol;
+    if (Array.isArray(audios)) audios.forEach(a => { if (a) a.volume = safeVol });
+    else if (audios) audios.volume = safeVol;
   };
 
   const handleRemoteMute = (userId) => {

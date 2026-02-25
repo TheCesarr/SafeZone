@@ -396,6 +396,14 @@ async def react_to_message(data: dict):
             reactions[r['emoji']].append(r['username'])
         
         conn.close()
+        
+        # Broadcast reaction to room
+        asyncio.create_task(broadcast(msg_row['channel_id'], json.dumps({
+            "type": "message_react",
+            "message_id": message_id,
+            "reactions": reactions
+        })))
+
         return {"status": "success", "action": action, "reactions": reactions, "message_id": message_id}
     except Exception as e:
         return safe_error(e)
@@ -543,12 +551,21 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
     lobby.active_connections[user_id] = websocket
     log_event("LOBBY", f"Lobby connection: {user_id}. Total: {len(lobby.active_connections)}")
 
-    # FORCE ONLINE STATUS
+    # APPLY PREFERRED STATUS INSTEAD OF FORCE ONLINE
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("UPDATE users SET status = 'online' WHERE username = ?", (user_id,))
-        conn.commit()
+        c.execute("SELECT preferred_status FROM users WHERE username = ?", (user_id,))
+        pref = c.fetchone()
+        if pref:
+            pref_status = pref['preferred_status']
+            # If invisible, keep them 'offline' in DB so they don't appear online to others
+            if pref_status == 'invisible':
+                new_status = 'offline'
+            else:
+                new_status = pref_status
+            c.execute("UPDATE users SET status = ? WHERE username = ?", (new_status, user_id))
+            conn.commit()
         conn.close()
     except Exception as e:
         log_event("ERROR", f"Status update error: {e}")
@@ -567,15 +584,16 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
                         "timestamp": msg.get("timestamp")
                     }))
                     
-                # HANDLE STATUS UPDATE
                 elif msg.get('type') == 'status_update':
                     new_status = msg.get('status')
                     if new_status in ['online', 'idle', 'dnd', 'invisible']:
-                        # Update DB
+                        target_status = 'offline' if new_status == 'invisible' else new_status
+                        # Update BOTH status and preferred_status to persist their choice
                         conn = get_db_connection()
                         c = conn.cursor()
-                        # Find username from token logic or passed user_id (here user_id is username)
-                        c.execute("UPDATE users SET status = ? WHERE username = ?", (new_status, user_id))
+                        c.execute("UPDATE users SET status = ?, preferred_status = ? WHERE username = ?", 
+                                 (target_status, new_status, user_id))
+                        # Also clear custom status if they switch back to 'online' (optional ux choice, but let's keep it simple for now and just update status)
                         conn.commit()
                         conn.close()
                         
@@ -717,7 +735,7 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
                  # --- SAVE TO DB ---
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("SELECT id FROM users WHERE username = ?", (data.get('sender', user_id),))
+                c.execute("SELECT id, username FROM users WHERE username = ?", (data.get('sender', user_id),))
                 user_row = c.fetchone()
                 if user_row:
                     c.execute('''INSERT INTO channel_messages 
@@ -726,11 +744,47 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
                               (room_id, user_row['id'], data.get('text', ""), 
                                data.get('attachment_url'), data.get('attachment_type'), data.get('attachment_name'),
                                data.get('reply_to_id')))
+                    msg_id = c.lastrowid
                     conn.commit()
+                    
+                    # Construct full message object for UI
+                    full_msg = {
+                        "type": "chat",
+                        "id": msg_id,
+                        "sender": user_row['username'],
+                        "text": data.get('text', ""),
+                        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                        "attachment_url": data.get('attachment_url'),
+                        "attachment_type": data.get('attachment_type'),
+                        "attachment_name": data.get('attachment_name'),
+                        "reply_to_id": data.get('reply_to_id'),
+                        "reactions": {},
+                        "is_pinned": False
+                    }
+                    
+                    # Try to fetch reply_to context if it exists
+                    if data.get('reply_to_id'):
+                        c.execute('''
+                            SELECT cm.id, cm.content, u.username as sender
+                            FROM channel_messages cm
+                            JOIN users u ON cm.sender_id = u.id
+                            WHERE cm.id = ?
+                        ''', (data.get('reply_to_id'),))
+                        reply_row = c.fetchone()
+                        if reply_row:
+                            full_msg["reply_to"] = {
+                                "id": reply_row['id'], 
+                                "sender": reply_row['sender'], 
+                                "text": reply_row['content'][:100]
+                            }
+                            
                 conn.close()
                 # ------------------
-                # Broadcast
-                await broadcast(room, json.dumps(data))
+                # Broadcast the full hydrated message
+                if user_row:
+                    await broadcast(room, json.dumps(full_msg))
+                else:
+                    await broadcast(room, json.dumps(data)) # Fallback
                 continue
 
             # HANDLE TYPING

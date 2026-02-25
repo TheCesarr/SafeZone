@@ -221,7 +221,7 @@ export const useServerData = (authState) => {
         myServers,
         friends, setFriends,
         friendRequests,
-        serverMembers,
+        serverMembers, setServerMembers,
         selectedServer, selectServer,
         selectedChannel, setSelectedChannel,
 

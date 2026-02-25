@@ -35,7 +35,7 @@ async def broadcast_room_update():
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute(f"SELECT username, status, display_name, avatar_url, avatar_color, discriminator FROM users WHERE username IN ({placeholders})", online_usernames)
+        c.execute(f"SELECT username, status, preferred_status, custom_status, display_name, avatar_url, avatar_color, discriminator FROM users WHERE username IN ({placeholders})", online_usernames)
         rows = c.fetchall()
         
         for row in rows:

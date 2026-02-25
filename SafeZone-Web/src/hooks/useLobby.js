@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { getUrl } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 
-export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnreadDM) => {
+export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnreadDM, onOnlineUsersUpdate) => {
     const lobbyWs = useRef(null);
     const [onlineUserIds, setOnlineUserIds] = useState([]);
     const [userStatuses, setUserStatuses] = useState({});
@@ -44,6 +44,7 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
                                 statuses[u.username] = u.status;
                             }
                         });
+                        if (onOnlineUsersUpdate) onOnlineUsersUpdate(data.online_users);
                     }
                     setOnlineUserIds(ids);
                     setUserStatuses(prev => ({ ...prev, ...statuses }));
@@ -60,6 +61,15 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
                         }]);
                     }
                     SoundManager.playMessage(); // Notification sound
+
+                    // Desktop notification
+                    if (window.SAFEZONE_API?.notify && document.hidden) {
+                        window.SAFEZONE_API.notify(
+                            `DM - ${data.sender}`,
+                            data.content.length > 80 ? data.content.slice(0, 80) + '…' : data.content
+                        );
+                    }
+
                     // Mark DM as unread if not currently viewing this conversation
                     if (!selectedDM || selectedDM.username !== data.sender) {
                         if (onUnreadDM) onUnreadDM(data.sender);

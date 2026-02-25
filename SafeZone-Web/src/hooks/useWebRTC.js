@@ -256,8 +256,34 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
                 // The <video> element in VoiceRoom will play this audio.
                 if (stream.getVideoTracks().length > 0) return;
 
+                // Web Audio API Amplification (Support up to 200% / 2.0 Gain)
+                let finalStream = stream;
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = ctx.createMediaStreamSource(stream);
+                    const gainNode = ctx.createGain();
+                    const destination = ctx.createMediaStreamDestination();
+
+                    source.connect(gainNode);
+                    gainNode.connect(destination);
+
+                    // Chromium Bug Workaround: keep raw stream active via muted audio element
+                    const dummyAudio = new Audio();
+                    dummyAudio.srcObject = stream;
+                    dummyAudio.muted = true;
+                    dummyAudio.play().catch(() => { });
+
+                    pc._audioCtx = ctx;
+                    pc._gainNode = gainNode;
+                    pc._dummyAudio = dummyAudio;
+
+                    finalStream = destination.stream;
+                } catch (e) {
+                    console.error("Web Audio API Amplification Failed:", e);
+                }
+
                 // Update React State so <App /> can render <audio>
-                setRemoteStreams(prev => ({ ...prev, [targetUuid]: stream }));
+                setRemoteStreams(prev => ({ ...prev, [targetUuid]: finalStream }));
             } else if (track.kind === 'video') {
                 // Determine if this is Screen Share or Camera
                 // For now, in this app version, ANY video is Screen Share 
@@ -484,7 +510,11 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             if (sourceId && window.SAFEZONE_API?.getSources) {
                 // Electron path: use chromeMediaSourceId (bypasses getDisplayMedia handler cleanly)
                 stream = await navigator.mediaDevices.getUserMedia({
-                    audio: false,
+                    audio: {
+                        mandatory: {
+                            chromeMediaSource: 'desktop'
+                        }
+                    },
                     video: {
                         mandatory: {
                             chromeMediaSource: 'desktop',

@@ -21,7 +21,9 @@ def migrate_db():
             ("avatar_color", "TEXT DEFAULT '#5865F2'"),
             ("status", "TEXT DEFAULT 'online'"),
             ("is_sysadmin", "BOOLEAN DEFAULT 0"),
-            ("recovery_pin", "TEXT")
+            ("recovery_pin", "TEXT"),
+            ("custom_status", "TEXT"),
+            ("preferred_status", "TEXT DEFAULT 'online'")
         ],
         "servers": [
             ("icon_url", "TEXT"),

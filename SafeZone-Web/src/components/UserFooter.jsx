@@ -28,6 +28,7 @@ const UserFooter = ({
     colors // Receive colors prop
 }) => {
     const [showStatusMenu, setShowStatusMenu] = useState(false);
+    const [customStatusInput, setCustomStatusInput] = useState(authState?.user?.custom_status || '');
 
     if (!authState || !authState.user) return <div style={{ padding: '10px', backgroundColor: colors?.sidebar || '#2f3136', borderTop: `1px solid ${colors?.border || 'rgba(0,0,0,0.1)'}`, color: colors?.textMuted || '#aaa', fontSize: '12px' }}>Yükleniyor...</div>;
 
@@ -43,9 +44,40 @@ const UserFooter = ({
         }
     };
 
-    const handleStatusClick = (status) => {
+    const handleStatusClick = async (status) => {
+        // Optimistic UI update via WS
         if (onStatusChange) onStatusChange(status);
         setShowStatusMenu(false);
+
+        // Persist to DB
+        try {
+            await fetch(getUrl('/user/status'), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: authState.token,
+                    preferred_status: status,
+                    custom_status: customStatusInput || null
+                })
+            });
+        } catch (e) { console.error("Status update error", e); }
+    };
+
+    const handleCustomStatusSave = async () => {
+        setShowStatusMenu(false);
+        try {
+            await fetch(getUrl('/user/status'), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: authState.token,
+                    preferred_status: authState.user.preferred_status || 'online',
+                    custom_status: customStatusInput || null
+                })
+            });
+            // Force a websocket reconnect-like status broadcast by setting status again
+            if (onStatusChange) onStatusChange(authState.user.preferred_status || 'online');
+        } catch (e) { console.error("Custom status update error", e); }
     };
 
     const bgColor = colors?.sidebar || '#131416';
@@ -72,6 +104,21 @@ const UserFooter = ({
                     backdropFilter: 'blur(10px)'
                 }}>
                     <div style={{ padding: '8px', color: mutedColor, fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>Durum Ayarla</div>
+
+                    <div style={{ padding: '4px 8px 8px 8px', borderBottom: `1px solid ${borderColor}`, marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <input
+                                type="text"
+                                placeholder="Özel bir durum belirle..."
+                                value={customStatusInput}
+                                onChange={e => setCustomStatusInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleCustomStatusSave()}
+                                style={{ flex: 1, padding: '6px', background: 'rgba(0,0,0,0.2)', border: 'none', borderRadius: '4px', color: textColor, fontSize: '12px' }}
+                            />
+                            <button onClick={handleCustomStatusSave} style={{ background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', padding: '0 8px', cursor: 'pointer', fontSize: '12px' }}>✓</button>
+                        </div>
+                    </div>
+
                     {[
                         { id: 'online', label: 'Çevrimiçi', color: '#3BA55C' },
                         { id: 'idle', label: 'Boşta', color: '#FAA61A' },
@@ -82,10 +129,10 @@ const UserFooter = ({
                             key={status.id}
                             onClick={() => handleStatusClick(status.id)}
                             className="interactive-button"
-                            style={{ padding: '10px', display: 'flex', alignItems: 'center', gap: '12px', color: textColor, borderRadius: '4px' }}
+                            style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: '12px', color: textColor, borderRadius: '4px' }}
                         >
                             <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: status.color, boxShadow: `0 0 8px ${status.color}40` }}></div>
-                            {status.label}
+                            <span style={{ fontSize: '13px' }}>{status.label}</span>
                         </div>
                     ))}
                 </div>

@@ -55,7 +55,7 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, o
     );
 };
 
-export const MessageContextMenu = ({ contextMenu, onDelete, onEdit }) => {
+export const MessageContextMenu = ({ contextMenu, onDelete, onEdit, onReply, onReactClick }) => {
     if (!contextMenu) return null;
     const isMe = contextMenu.msg.sender === contextMenu.currentUser?.username;
     // Allow if ME or SYSADMIN
@@ -63,11 +63,23 @@ export const MessageContextMenu = ({ contextMenu, onDelete, onEdit }) => {
 
     return (
         <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '4px', padding: '5px', zIndex: 20000, minWidth: '120px' }}>
+            {onReactClick && (
+                <div onClick={(e) => { e.stopPropagation(); onReactClick(contextMenu); }} style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' }, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>➕</span><span>Tepki Ekle</span>
+                </div>
+            )}
+            <div style={{ height: '1px', background: '#333', margin: '4px 0' }} />
+            {onReply && (
+                <div onClick={() => onReply(contextMenu.msg)} style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' } }}>
+                    ↩️ Yanıtla
+                </div>
+            )}
             {canEdit && (
                 <div onClick={() => onEdit(contextMenu.msg)} style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' } }}>
                     ✏️ Düzenle
                 </div>
             )}
+            <div style={{ height: '1px', background: '#333', margin: '4px 0' }} />
             <div onClick={() => onDelete(contextMenu.msg)} style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#f04747', color: '#fff' } }}>
                 🗑️ Sil
             </div>

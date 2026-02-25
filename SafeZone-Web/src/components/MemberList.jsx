@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { getUrl } from '../utils/api';
+import ProfileCard from './ProfileCard';
 
 const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu }) => {
+    const [selectedUserForProfile, setSelectedUserForProfile] = useState(null);
 
     // Group members: Online, Offline
     const groupedMembers = useMemo(() => {
@@ -87,6 +89,13 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.cardHover}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                             onContextMenu={(e) => handleUserContextMenu(e, member)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUserForProfile({
+                                    user: member,
+                                    rect: e.currentTarget.getBoundingClientRect()
+                                });
+                            }}
                         >
                             <div style={{ position: 'relative', marginRight: '10px' }}>
                                 <div style={{
@@ -156,6 +165,13 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.cardHover; e.currentTarget.style.opacity = 0.8; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.opacity = 0.5; }}
                             onContextMenu={(e) => handleUserContextMenu(e, member)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUserForProfile({
+                                    user: member,
+                                    rect: e.currentTarget.getBoundingClientRect()
+                                });
+                            }}
                         >
                             <div style={{ marginRight: '10px' }}>
                                 <div style={{
@@ -187,6 +203,16 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                     ))}
                 </div>
             </div>
+
+            {/* Profile Card Modal Overlay */}
+            {selectedUserForProfile && (
+                <ProfileCard
+                    user={selectedUserForProfile.user}
+                    rect={selectedUserForProfile.rect}
+                    colors={colors}
+                    onClose={() => setSelectedUserForProfile(null)}
+                />
+            )}
         </div>
     );
 };

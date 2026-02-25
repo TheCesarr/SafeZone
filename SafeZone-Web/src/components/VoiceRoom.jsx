@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { getUrl } from '../utils/api';
 
 const VoiceRoom = ({
     selectedChannel,
@@ -231,10 +232,11 @@ const VoiceRoom = ({
                     const isDeafened = voiceStates[user.uuid]?.isDeafened;
                     const isSharing = voiceStates[user.uuid]?.isScreenSharing;
 
+                    // Fetch rich data from serverMembers via getUser helper
+                    const enrichedUser = getUser(user.uuid) || user;
+
                     // Safe Color Logic
-                    // Use AVATAR_COLORS array directly since 'colors' prop is a theme object
-                    const usernameLen = (user.username || "").length;
-                    const bg = AVATAR_COLORS[usernameLen % AVATAR_COLORS.length];
+                    const bg = enrichedUser.avatar_color || AVATAR_COLORS[((enrichedUser.username || "").length) % AVATAR_COLORS.length];
 
                     return (
                         <div
@@ -242,7 +244,7 @@ const VoiceRoom = ({
                             onContextMenu={(e) => handleContextMenu(e, user.uuid)}
                             style={{
                                 position: 'relative',
-                                backgroundColor: '#2f3136',
+                                backgroundColor: bg, // Use avatar_color as card background
                                 borderRadius: '8px',
                                 minWidth: showStage ? '200px' : 'auto',
                                 height: showStage ? '120px' : '100%',
@@ -253,45 +255,65 @@ const VoiceRoom = ({
                                 border: isSpeaking ? '3px solid #3BA55C' : '3px solid transparent',
                                 boxShadow: isSpeaking ? '0 0 15px rgba(59, 165, 92, 0.3)' : 'none',
                                 transition: 'all 0.1s',
-                                cursor: 'default'
+                                cursor: 'default',
+                                overflow: 'hidden'
                             }}
                         >
+                            {/* CENTER AVATAR */}
                             <div style={{ position: 'relative' }}>
                                 <div style={{
-                                    width: showStage ? '50px' : '80px',
-                                    height: showStage ? '50px' : '80px',
+                                    width: showStage ? '40px' : '64px',
+                                    height: showStage ? '40px' : '64px',
                                     borderRadius: '50%',
-                                    backgroundColor: bg,
+                                    backgroundColor: '#18191c', // Dark backup if img fails
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: showStage ? '20px' : '32px',
+                                    fontSize: showStage ? '16px' : '24px',
                                     color: '#fff',
-                                    marginBottom: '10px'
+                                    overflow: 'hidden',
+                                    boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
                                 }}>
-                                    {(getDisplayName(user.uuid) || "?").substring(0, 2).toUpperCase()}
+                                    {enrichedUser.avatar_url ? (
+                                        <img src={getUrl(enrichedUser.avatar_url)} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                        (getDisplayName(user.uuid) || "?").substring(0, 2).toUpperCase()
+                                    )}
                                 </div>
                                 {isSharing && (
-                                    <div style={{ position: 'absolute', bottom: '5px', right: '-5px', backgroundColor: '#ED4245', borderRadius: '50%', padding: '4px', border: '2px solid #2f3136' }}>
-                                        <span style={{ fontSize: '12px' }}>🖥️</span>
+                                    <div style={{ position: 'absolute', bottom: '0', right: '-4px', backgroundColor: '#ED4245', borderRadius: '50%', padding: '4px', border: `2px solid ${bg}` }}>
+                                        <span style={{ fontSize: '10px' }}>🖥️</span>
                                     </div>
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '5px' }}>
-                                <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>
+                            {/* BOTTOM-LEFT NAME BADGE */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                left: '8px',
+                                backgroundColor: 'rgba(0,0,0,0.6)',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                backdropFilter: 'blur(4px)'
+                            }}>
+                                <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap' }}>
                                     {getDisplayName(user.uuid)}
                                 </span>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
-                                {isMuted && <span title="Susturuldu">🎙️❌</span>}
-                                {isDeafened && <span title="Sağırlaştırıldı">🎧❌</span>}
+                                {(isMuted || isDeafened) && (
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        {isMuted && <span title="Susturuldu" style={{ fontSize: '12px' }}>🎙️❌</span>}
+                                        {isDeafened && <span title="Sağırlaştırıldı" style={{ fontSize: '12px' }}>🎧❌</span>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Watch Stream Button (Manual) */}
                             {isSharing && safeRemoteScreenStreams[user.uuid] && focusedStreamId !== user.uuid && (
                                 <button
                                     onClick={() => setFocusedStreamId(user.uuid)}
-                                    style={{ marginTop: '5px', background: '#5865F2', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                    style={{ position: 'absolute', bottom: '8px', right: '8px', background: '#5865F2', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}
                                 >
                                     Yayını İzle
                                 </button>
