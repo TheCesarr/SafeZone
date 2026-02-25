@@ -802,15 +802,17 @@ function App() {
         contextMenu={chat.messageContextMenu}
         currentUser={authState.user}
         onDelete={chat.handleDeleteMessage}
-        onEdit={chat.startEditing}
+        onEdit={(msg) => {
+          chat.startEditing(msg);
+        }}
         onReply={(msg) => {
           chat.setReplyingTo({ id: msg.id, sender: msg.sender, text: msg.text });
-          chat.setMessageContextMenu(null);
+          setTimeout(() => chat.setMessageContextMenu(null), 0);
         }}
         onReactClick={(context) => {
           chat.setActiveEmojiPickerId(context.msg.id);
           chat.setEmojiPickerPosition({ x: context.x, y: context.y });
-          chat.setMessageContextMenu(null);
+          setTimeout(() => chat.setMessageContextMenu(null), 0);
         }}
       />
 
