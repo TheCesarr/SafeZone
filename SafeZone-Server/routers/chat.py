@@ -398,11 +398,13 @@ async def react_to_message(data: dict):
         conn.close()
         
         # Broadcast reaction to room
-        asyncio.create_task(broadcast(msg_row['channel_id'], json.dumps({
-            "type": "message_react",
-            "message_id": message_id,
-            "reactions": reactions
-        })))
+        channel_id_str = str(msg_row['channel_id'])
+        if channel_id_str in rooms:
+            asyncio.create_task(broadcast(rooms[channel_id_str], json.dumps({
+                "type": "message_react",
+                "message_id": message_id,
+                "reactions": reactions
+            })))
 
         return {"status": "success", "action": action, "reactions": reactions, "message_id": message_id}
     except Exception as e:
