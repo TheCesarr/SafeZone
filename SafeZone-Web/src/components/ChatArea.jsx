@@ -41,7 +41,8 @@ const ChatArea = ({
     setActiveEmojiPickerId,
     emojiPickerPosition = null,
     setEmojiPickerPosition,
-    authToken = null
+    authToken = null,
+    setMessages
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
@@ -444,11 +445,21 @@ const ChatArea = ({
                                                     onClick={async (e) => {
                                                         e.stopPropagation();
                                                         try {
-                                                            await fetch(getUrl('/message/react'), {
+                                                            const res = await fetch(getUrl('/message/react'), {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
                                                                 body: JSON.stringify({ token: authToken, message_id: msg.id, emoji })
                                                             });
+                                                            if (res.ok) {
+                                                                const data = await res.json();
+                                                                if (data.reactions !== undefined) {
+                                                                    // Optimistically update local state immediately
+                                                                    const msgId = msg.id;
+                                                                    window.__szSetMessages && window.__szSetMessages(prev => prev.map(m =>
+                                                                        m.id === msgId ? { ...m, reactions: data.reactions } : m
+                                                                    ));
+                                                                }
+                                                            }
                                                         } catch (err) { console.error(err); }
                                                     }}
                                                     style={{
@@ -492,14 +503,23 @@ const ChatArea = ({
                             onEmojiClick={async (emojiObj) => {
                                 const msgId = activeEmojiPickerId;
                                 setActiveEmojiPickerId(null);
-                                // Call backend to react
                                 try {
                                     const res = await fetch(getUrl('/message/react'), {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ token: authToken, message_id: msgId, emoji: emojiObj.emoji })
                                     });
-                                    if (!res.ok) console.error("Failed to react");
+                                    if (res.ok) {
+                                        const data = await res.json();
+                                        if (data.reactions !== undefined) {
+                                            // Immediately update reactions in local state (no WS needed)
+                                            setMessages && setMessages(prev => prev.map(m =>
+                                                m.id === msgId ? { ...m, reactions: data.reactions } : m
+                                            ));
+                                        }
+                                    } else {
+                                        console.error("Failed to react");
+                                    }
                                 } catch (e) {
                                     console.error(e);
                                 }
