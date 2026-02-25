@@ -257,22 +257,22 @@ const ChatArea = ({
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '6px',
-                                                marginBottom: '4px',
-                                                color: colors?.textMuted || '#b9bbbe',
-                                                fontSize: '12px',
+                                                marginBottom: '6px',
+                                                color: colors?.textMuted || '#b5bac1',
+                                                fontSize: '13px',
                                                 position: 'relative',
                                             }}>
-                                                {/* Curved line pointing to reply */}
+                                                {/* L-Shaped curve pointing to reply */}
                                                 <div style={{
                                                     position: 'absolute',
                                                     left: '-32px',
                                                     top: '50%',
-                                                    width: '24px',
-                                                    height: '16px',
+                                                    width: '28px',
+                                                    height: '14px',
                                                     borderLeft: `2px solid ${colors?.border || '#4f545c'}`,
                                                     borderTop: `2px solid ${colors?.border || '#4f545c'}`,
                                                     borderTopLeftRadius: '6px',
-                                                    transform: 'translateY(-10px)'
+                                                    transform: 'translateY(-6px)'
                                                 }}></div>
 
                                                 {/* Reply Avatar Mini */}
@@ -286,15 +286,16 @@ const ChatArea = ({
                                                     })()}
                                                 </div>
 
-                                                <span style={{ fontWeight: 600, color: getRoleColor(msg.reply_to.sender) || (colors?.textMuted || '#b9bbbe') }}>
+                                                <span style={{ fontWeight: 600, color: getRoleColor(msg.reply_to.sender) || (colors?.text || '#f2f3f5'), cursor: 'pointer' }}>
                                                     @{msg.reply_to.sender}
                                                 </span>
                                                 <span style={{
                                                     whiteSpace: 'nowrap',
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis',
-                                                    maxWidth: '300px',
-                                                    cursor: 'pointer'
+                                                    maxWidth: '400px',
+                                                    cursor: 'pointer',
+                                                    opacity: 0.8
                                                 }}
                                                     title="Mesaja git"
                                                 >
@@ -450,24 +451,24 @@ const ChatArea = ({
                                                         } catch (err) { console.error(err); }
                                                     }}
                                                     style={{
-                                                        background: hasReacted ? 'rgba(88, 101, 242, 0.3)' : (colors?.card || 'rgba(255,255,255,0.06)'),
-                                                        border: `1px solid ${hasReacted ? '#5865F2' : (colors?.border || 'rgba(255,255,255,0.1)')}`,
-                                                        borderRadius: '6px',
-                                                        padding: '2px 6px',
+                                                        background: hasReacted ? 'rgba(88, 101, 242, 0.15)' : (colors?.card || '#2b2d31'),
+                                                        border: `1px solid ${hasReacted ? '#5865F2' : 'transparent'}`,
+                                                        borderRadius: '8px',
+                                                        padding: '2px 8px',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '6px',
+                                                        gap: '4px',
                                                         cursor: 'pointer',
-                                                        fontSize: '13px',
+                                                        fontSize: '1rem',
                                                         userSelect: 'none',
-                                                        transition: 'transform 0.1s',
+                                                        transition: 'transform 0.1s, background 0.1s',
                                                     }}
-                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; if (!hasReacted) e.currentTarget.style.background = '#313338'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; if (!hasReacted) e.currentTarget.style.background = (colors?.card || '#2b2d31'); }}
                                                     title={`${userUuids.length} kişi tepki bıraktı`}
                                                 >
-                                                    <span>{emoji}</span>
-                                                    <span style={{ color: hasReacted ? '#fff' : (colors?.textMuted || '#b9bbbe'), fontWeight: 600, fontSize: '12px' }}>{userUuids.length}</span>
+                                                    <span style={{ display: 'flex', alignItems: 'center', fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif' }}>{emoji}</span>
+                                                    <span style={{ color: hasReacted ? '#fff' : '#b5bac1', fontWeight: 600, fontSize: '12px' }}>{userUuids.length}</span>
                                                 </div>
                                             );
                                         })}
@@ -542,28 +543,33 @@ const ChatArea = ({
             {/* Replying To Banner */}
             {replyingTo && (
                 <div style={{
-                    background: colors?.card || 'rgba(255,255,255,0.04)',
-                    padding: '8px 14px',
-                    margin: '0 20px 6px',
+                    background: '#2b2d31',
+                    padding: '8px 12px 8px 16px',
+                    margin: '0 20px',
                     borderRadius: '8px 8px 0 0',
                     display: 'flex',
                     alignItems: 'center',
-                    border: `1px solid ${colors?.border || 'rgba(255,255,255,0.08)'}`,
-                    borderBottom: 'none',
-                    backdropFilter: 'blur(8px)',
+                    borderTop: `1px solid ${colors?.border || 'transparent'}`,
+                    borderLeft: `1px solid ${colors?.border || 'transparent'}`,
+                    borderRight: `1px solid ${colors?.border || 'transparent'}`,
                     position: 'relative',
-                    bottom: '-6px'
+                    top: '12px',
+                    zIndex: 1
                 }}>
-                    <span style={{ color: colors?.textMuted || '#b9bbbe', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1 }}>
-                        <span style={{ fontSize: '16px' }}>↪</span>
-                        <strong style={{ color: colors?.text || '#fff', fontWeight: 600 }}>@{replyingTo.sender}</strong> yanıtlanıyor
+                    <span style={{ color: '#b5bac1', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', flexGrow: 1 }}>
+                        <strong style={{ color: '#f2f3f5', fontWeight: 600 }}>{replyingTo.sender}</strong> kişisine yanıt veriliyor
                     </span>
-                    <button onClick={() => setReplyingTo(null)} style={{
-                        background: 'none', border: 'none', color: '#b9bbbe', cursor: 'pointer', fontSize: '18px', padding: '0 4px',
-                        transition: 'color 0.15s'
-                    }} onMouseEnter={e => e.target.style.color = '#fff'} onMouseLeave={e => e.target.style.color = '#b9bbbe'}>
-                        ×
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ color: '#00a8fc', fontWeight: 700, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '14px' }}>@</span> AÇIK
+                        </span>
+                        <button onClick={() => setReplyingTo(null)} style={{
+                            background: '#232428', border: 'none', color: '#b5bac1', cursor: 'pointer', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
+                            transition: 'color 0.15s'
+                        }} onMouseEnter={e => e.target.style.color = '#fff'} onMouseLeave={e => e.target.style.color = '#b5bac1'}>
+                            ×
+                        </button>
+                    </div>
                 </div>
             )}
 
