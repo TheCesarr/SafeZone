@@ -602,6 +602,7 @@ function App() {
                 setActiveEmojiPickerId={chat.setActiveEmojiPickerId}
                 emojiPickerPosition={chat.emojiPickerPosition}
                 setEmojiPickerPosition={chat.setEmojiPickerPosition}
+                authToken={authState.token}
               />
 
               {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}

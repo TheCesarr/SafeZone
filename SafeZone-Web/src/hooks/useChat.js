@@ -205,14 +205,14 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
     // --- EDIT / DELETE ---
     const handleMessageContextMenu = (e, msg) => {
-        if (msg.sender !== authState.user.username && !authState.user.is_sysadmin) return;
         e.preventDefault();
-        setMessageContextMenu({ x: e.pageX, y: e.pageY, msg });
+        setMessageContextMenu({ x: e.pageX, y: e.pageY, msg, currentUser: authState.user });
     }
 
-    const handleDeleteMessage = async () => {
-        if (!messageContextMenu) return;
-        const msgId = messageContextMenu.msg.id;
+    const handleDeleteMessage = async (msg) => {
+        const msgToDelete = msg || messageContextMenu?.msg;
+        if (!msgToDelete) return;
+        const msgId = msgToDelete.id;
         try {
             await fetch(getUrl('/message/delete'), {
                 method: 'POST',
@@ -224,9 +224,11 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         } catch (e) { console.error(e); }
     }
 
-    const startEditing = () => {
-        setEditingMessageId(messageContextMenu.msg.id);
-        setEditText(messageContextMenu.msg.content || messageContextMenu.msg.text || "");
+    const startEditing = (msg) => {
+        const msgToEdit = msg || messageContextMenu?.msg;
+        if (!msgToEdit) return;
+        setEditingMessageId(msgToEdit.id);
+        setEditText(msgToEdit.content || msgToEdit.text || "");
         setMessageContextMenu(null);
     }
 

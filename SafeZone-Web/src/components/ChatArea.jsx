@@ -40,7 +40,8 @@ const ChatArea = ({
     activeEmojiPickerId = null,
     setActiveEmojiPickerId,
     emojiPickerPosition = null,
-    setEmojiPickerPosition
+    setEmojiPickerPosition,
+    authToken = null
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
@@ -446,7 +447,7 @@ const ChatArea = ({
                                                             await fetch(getUrl('/message/react'), {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ token: currentUser.token, message_id: msg.id, emoji })
+                                                                body: JSON.stringify({ token: authToken, message_id: msg.id, emoji })
                                                             });
                                                         } catch (err) { console.error(err); }
                                                     }}
@@ -496,7 +497,7 @@ const ChatArea = ({
                                     const res = await fetch(getUrl('/message/react'), {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ token: currentUser.token, message_id: msgId, emoji: emojiObj.emoji })
+                                        body: JSON.stringify({ token: authToken, message_id: msgId, emoji: emojiObj.emoji })
                                     });
                                     if (!res.ok) console.error("Failed to react");
                                 } catch (e) {
