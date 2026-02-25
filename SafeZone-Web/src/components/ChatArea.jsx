@@ -253,7 +253,7 @@ const ChatArea = ({
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                         {/* --- REPLY CONTEXT BANNER --- */}
-                                        {msg.reply_to && (
+                                        {msg.reply_to && msg.reply_to.sender && (
                                             <div style={{
                                                 display: 'flex',
                                                 alignItems: 'center',

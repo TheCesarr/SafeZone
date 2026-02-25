@@ -704,7 +704,9 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
-        SELECT cm.content, cm.timestamp, u.username as sender
+        SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type,
+               cm.attachment_name, cm.edited_at, cm.reply_to_id, cm.is_pinned,
+               u.username as sender
         FROM channel_messages cm
         JOIN users u ON cm.sender_id = u.id
         WHERE cm.channel_id = ?
@@ -712,11 +714,57 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
         LIMIT 50
     ''', (room_id,))
     
+    rows = c.fetchall()
+    msg_ids = [row['id'] for row in rows]
+
+    # Fetch reactions
+    reactions_map = {}
+    if msg_ids:
+        placeholders = ','.join(['?'] * len(msg_ids))
+        c.execute(f'''
+            SELECT mr.message_id, mr.emoji, u.username
+            FROM message_reactions mr
+            JOIN users u ON mr.user_id = u.id
+            WHERE mr.message_id IN ({placeholders})
+        ''', msg_ids)
+        for r in c.fetchall():
+            mid = r['message_id']
+            if mid not in reactions_map:
+                reactions_map[mid] = {}
+            emoji = r['emoji']
+            if emoji not in reactions_map[mid]:
+                reactions_map[mid][emoji] = []
+            reactions_map[mid][emoji].append(r['username'])
+
+    # Fetch reply_to context
+    reply_ids = [row['reply_to_id'] for row in rows if row['reply_to_id']]
+    reply_map = {}
+    if reply_ids:
+        placeholders = ','.join(['?'] * len(reply_ids))
+        c.execute(f'''
+            SELECT cm.id, cm.content, u.username as sender
+            FROM channel_messages cm
+            JOIN users u ON cm.sender_id = u.id
+            WHERE cm.id IN ({placeholders})
+        ''', reply_ids)
+        for r in c.fetchall():
+            reply_map[r['id']] = {"id": r['id'], "sender": r['sender'], "text": r['content'][:100]}
+
     history_msgs = []
-    for row in c.fetchall():
+    for row in rows:
         history_msgs.append({
+            "id": row['id'],
             "sender": row['sender'],
-            "text": row['content']
+            "text": row['content'],
+            "content": row['content'],
+            "timestamp": row['timestamp'],
+            "attachment_url": row['attachment_url'],
+            "attachment_type": row['attachment_type'],
+            "attachment_name": row['attachment_name'],
+            "edited_at": row['edited_at'],
+            "is_pinned": bool(row['is_pinned']),
+            "reactions": reactions_map.get(row['id'], {}),
+            "reply_to": reply_map.get(row['reply_to_id'])
         })
     conn.close()
     
