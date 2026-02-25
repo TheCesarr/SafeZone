@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query
 from database import get_db_connection, DB_NAME
-from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES, check_channel_membership, check_server_membership, validate_upload, ALLOWED_CHAT_EXTS
+from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES, check_channel_membership, check_server_membership, validate_upload, ALLOWED_CHAT_EXTS, safe_error
 from state import lobby, rooms, VoiceRoom, broadcast_room_update, broadcast_user_list
 import sqlite3
 import json
@@ -9,6 +9,7 @@ import os
 import re
 import urllib.request
 import datetime
+import asyncio
 
 router = APIRouter(tags=["chat"])
 
