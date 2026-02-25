@@ -73,12 +73,16 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
                 }
             }
             setMessages(prev => [...prev, {
+                id: msg.id,
                 sender: msg.sender,
                 text: msg.text,
+                content: msg.text,
                 attachment_url: msg.attachment_url,
                 attachment_type: msg.attachment_type,
                 attachment_name: msg.attachment_name,
-                timestamp: new Date().toISOString(),
+                timestamp: msg.timestamp || new Date().toISOString(),
+                reply_to: msg.reply_to || null,
+                reactions: msg.reactions || {},
                 _new: true // flag for animation
             }]);
         } else if (msg.type === 'history') {

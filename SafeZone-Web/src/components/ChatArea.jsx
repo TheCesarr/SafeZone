@@ -309,7 +309,7 @@ const ChatArea = ({
                                             style={{
                                                 color: colors?.text || '#dcddde',
                                                 marginTop: isGrouped ? 0 : '2px',
-                                                cursor: isMe ? 'context-menu' : 'text',
+                                                cursor: 'context-menu',
                                                 fontSize: '14px',
                                                 lineHeight: '1.45',
                                             }}
