@@ -312,6 +312,29 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             if (event.candidate) sendSignal({ type: 'ice', candidate: event.candidate, target: targetUuid });
         }
 
+        // Fix 3: Detect failed ICE connections and trigger renegotiation
+        pc.oniceconnectionstatechange = () => {
+            const state = pc.iceConnectionState;
+            console.log(`[WebRTC] ICE state for ${targetUuid}:`, state);
+            if (state === 'failed' || state === 'disconnected') {
+                console.warn(`[WebRTC] Connection to ${targetUuid} ${state}. Tearing down for renegotiation.`);
+                pc.close();
+                delete peerConnections.current[targetUuid];
+                // Trigger fresh offer after short delay
+                setTimeout(() => {
+                    const user = activeUsersRef.current.find(u => u.uuid === targetUuid);
+                    if (user && localStream.current) {
+                        const newPc = createPC(targetUuid);
+                        newPc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
+                            .then(offer => newPc.setLocalDescription(offer).then(() => {
+                                sendSignal({ type: 'offer', sdp: offer, target: targetUuid });
+                            }))
+                            .catch(() => { });
+                    }
+                }, 2000);
+            }
+        };
+
         peerConnections.current[targetUuid] = pc;
         return pc;
     }
@@ -341,6 +364,30 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             } catch (e) { }
         }
     }
+
+    // Fix 3: Renegotiation interval — ensures all users in room have active connections
+    useEffect(() => {
+        if (!activeVoiceChannel) return;
+        const interval = setInterval(async () => {
+            if (!localStream.current || !roomWs.current || roomWs.current.readyState !== WebSocket.OPEN) return;
+            const myId = authState.user?.username || uuid.current;
+            for (const user of activeUsersRef.current) {
+                if (user.uuid === myId) continue;
+                const pc = peerConnections.current[user.uuid];
+                const needsOffer = !pc || pc.connectionState === 'failed' || pc.iceConnectionState === 'failed';
+                if (needsOffer) {
+                    console.log(`[WebRTC] Renegotiation: offering to missing peer ${user.uuid}`);
+                    const newPc = createPC(user.uuid);
+                    try {
+                        const offer = await newPc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+                        await newPc.setLocalDescription(offer);
+                        sendSignal({ type: 'offer', sdp: offer, target: user.uuid });
+                    } catch (e) { }
+                }
+            }
+        }, 7000); // Check every 7 seconds
+        return () => clearInterval(interval);
+    }, [activeVoiceChannel]); // Restarts when channel changes
 
     // --- DEVICE CHANGE EFFECTS ---
     useEffect(() => {

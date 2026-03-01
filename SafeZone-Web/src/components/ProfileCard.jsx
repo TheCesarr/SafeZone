@@ -1,9 +1,42 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { getUrl } from '../utils/api';
 
-const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect }) => {
+const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect, currentUser, selectedServer, authToken }) => {
     const cardRef = useRef(null);
     const [position, setPosition] = useState({ opacity: 0 }); // Invisible strictly for measuring
+
+    // Fix 5: Role assignment state
+    const [assignedRoleIds, setAssignedRoleIds] = useState(() => {
+        if (!user?.roles) return [];
+        return user.roles.map(r => r.id ?? r.role_id).filter(Boolean);
+    });
+    const [roleLoading, setRoleLoading] = useState(null); // role_id being toggled
+
+    const canManageRoles = currentUser?.is_sysadmin ||
+        selectedServer?.owner_id === currentUser?.id ||
+        currentUser?.permissions?.includes?.('MANAGE_ROLES');
+
+    const toggleRole = useCallback(async (role) => {
+        if (!authToken || !selectedServer || !user) return;
+        const hasRole = assignedRoleIds.includes(role.id);
+        const action = hasRole ? 'unassign' : 'assign';
+        setRoleLoading(role.id);
+        try {
+            const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${role.id}/${action}`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authToken, user_id: user.id })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                setAssignedRoleIds(prev =>
+                    hasRole ? prev.filter(id => id !== role.id) : [...prev, role.id]
+                );
+            }
+        } catch (e) { console.error('Role toggle error:', e); }
+        finally { setRoleLoading(null); }
+    }, [assignedRoleIds, authToken, selectedServer, user]);
+
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -176,13 +209,48 @@ const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect }) => {
                                 SysAdmin
                             </div>
                         )}
-                        {(!user.is_sysadmin || user.highest_role) && (
+                        {serverRoles.length > 0 ? serverRoles.map(role => {
+                            const isAssigned = assignedRoleIds.includes(role.id);
+                            const isLoading = roleLoading === role.id;
+                            const color = role.color || '#5865F2';
+                            return (
+                                <div
+                                    key={role.id}
+                                    onClick={() => canManageRoles && !isLoading && toggleRole(role)}
+                                    title={canManageRoles ? (isAssigned ? `Rolü Kaldır: ${role.name}` : `Rolü Ata: ${role.name}`) : role.name}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        backgroundColor: isAssigned ? `${color}22` : 'rgba(0,0,0,0.15)',
+                                        border: `1px solid ${isAssigned ? color + '60' : 'rgba(255,255,255,0.1)'}`,
+                                        color: isAssigned ? color : mutedColor,
+                                        fontSize: '11px',
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        cursor: canManageRoles ? 'pointer' : 'default',
+                                        opacity: isLoading ? 0.5 : 1,
+                                        transition: 'all 0.15s ease',
+                                        userSelect: 'none',
+                                    }}
+                                    onMouseEnter={e => { if (canManageRoles) e.currentTarget.style.filter = 'brightness(1.3)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+                                >
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isAssigned ? color : 'rgba(255,255,255,0.2)', flexShrink: 0 }}></span>
+                                    {isLoading ? '...' : role.name}
+                                    {canManageRoles && !isLoading && (
+                                        <span style={{ opacity: 0.5, fontSize: '10px', marginLeft: '2px' }}>
+                                            {isAssigned ? '✕' : '+'}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        }) : (
                             <div style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.2)', border: `1px solid ${displayRoleColor}40`, color: textColor, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: displayRoleColor }}></span>
                                 {displayRoleName}
                             </div>
                         )}
                     </div>
+
                 </div>
             </div>
         </div>

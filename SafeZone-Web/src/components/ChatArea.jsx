@@ -42,7 +42,9 @@ const ChatArea = ({
     emojiPickerPosition = null,
     setEmojiPickerPosition,
     authToken = null,
-    setMessages
+    setMessages,
+    serverRoles = [],
+    selectedServer = null
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
@@ -757,6 +759,10 @@ const ChatArea = ({
                     user={selectedUserForProfile.user}
                     rect={selectedUserForProfile.rect}
                     colors={colors}
+                    serverRoles={serverRoles}
+                    currentUser={currentUser}
+                    selectedServer={selectedServer}
+                    authToken={authToken}
                     onClose={() => setSelectedUserForProfile(null)}
                 />
             )}

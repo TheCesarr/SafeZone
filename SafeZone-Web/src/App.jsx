@@ -604,6 +604,8 @@ function App() {
                 setEmojiPickerPosition={chat.setEmojiPickerPosition}
                 authToken={authState.token}
                 setMessages={chat.setMessages}
+                serverRoles={serverData.serverRoles || []}
+                selectedServer={serverData.selectedServer}
               />
 
               {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}
@@ -616,6 +618,10 @@ function App() {
                   width={memberListWidth}
                   onResizeStart={handleResizeStart}
                   handleUserContextMenu={handleUserContextMenu}
+                  serverRoles={serverData.serverRoles || []}
+                  currentUser={authState.user}
+                  selectedServer={serverData.selectedServer}
+                  authToken={authState.token}
                 />
               )}
             </>

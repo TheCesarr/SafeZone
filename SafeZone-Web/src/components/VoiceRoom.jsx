@@ -1,5 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getUrl } from '../utils/api';
+
+// Memoized video element — does NOT re-render when parent state changes (Fix: Screen Share Flickering)
+const StableVideo = React.memo(({ stream, muted = false, style }) => {
+    const videoRef = useRef(null);
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream]);
+    return <video ref={videoRef} autoPlay playsInline muted={muted} style={style} />;
+});
 
 const VoiceRoom = ({
     selectedChannel,
@@ -23,6 +34,26 @@ const VoiceRoom = ({
     const [focusedStreamId, setFocusedStreamId] = useState(null);
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, userId: null });
     const contextMenuRef = useRef(null);
+
+    // Fix 4: Persist per-user volume levels in localStorage
+    const [userVolumes, setUserVolumes] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('safezone_user_volumes') || '{}'); }
+        catch { return {}; }
+    });
+
+    const setUserVolume = useCallback((userId, value) => {
+        setUserVolumes(prev => {
+            const next = { ...prev, [userId]: value };
+            localStorage.setItem('safezone_user_volumes', JSON.stringify(next));
+            return next;
+        });
+        // Also apply immediately to live audio
+        if (remoteAudioRefs?.current) {
+            const audios = remoteAudioRefs.current[userId];
+            if (Array.isArray(audios)) audios.forEach(a => { if (a) a.volume = value; });
+            else if (audios) audios.volume = value;
+        }
+    }, [remoteAudioRefs]);
 
     // Auto-focus local screen share in Stage when sharing starts
     useEffect(() => {
@@ -68,15 +99,9 @@ const VoiceRoom = ({
         });
     };
 
-    const adjustVolume = (userId, val) => {
-        if (!remoteAudioRefs?.current) return;
-        const audios = remoteAudioRefs.current[userId];
-        if (Array.isArray(audios)) {
-            audios.forEach(a => { if (a) a.volume = val; });
-        } else if (audios) {
-            audios.volume = val;
-        }
-    };
+    const adjustVolume = useCallback((userId, val) => {
+        setUserVolume(userId, val);
+    }, [setUserVolume]);
 
     const toggleLocalMute = (userId) => {
         if (!remoteAudioRefs?.current) return;
@@ -182,15 +207,14 @@ const VoiceRoom = ({
                     style={{ flex: '1 1 60%', backgroundColor: '#0e0e0e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative', borderBottom: '1px solid #202225' }}
                 >
                     {focusedStreamId === 'local' && screenStreamRef?.current ? (
-                        <video
-                            ref={el => { if (el) el.srcObject = screenStreamRef.current }}
-                            autoPlay playsInline muted
+                        <StableVideo
+                            stream={screenStreamRef.current}
+                            muted
                             style={{ maxHeight: '100%', maxWidth: '100%', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}
                         />
                     ) : safeRemoteScreenStreams[focusedStreamId] ? (
-                        <video
-                            ref={el => { if (el) el.srcObject = safeRemoteScreenStreams[focusedStreamId] }}
-                            autoPlay playsInline
+                        <StableVideo
+                            stream={safeRemoteScreenStreams[focusedStreamId]}
                             style={{ maxHeight: '100%', maxWidth: '100%', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}
                         />
                     ) : (
@@ -363,11 +387,13 @@ const VoiceRoom = ({
                     </div>
 
                     <div style={{ padding: '8px 12px', borderTop: '1px solid #333' }}>
-                        <div style={{ color: '#bbb', fontSize: '12px', marginBottom: '4px' }}>Kullanıcı Sesi</div>
+                        <div style={{ color: '#bbb', fontSize: '12px', marginBottom: '4px' }}>
+                            Kullanıcı Sesi ({Math.round((userVolumes[contextMenu.userId] ?? 1) * 100)}%)
+                        </div>
                         <input
                             type="range"
                             min="0" max="200" step="1"
-                            defaultValue="100"
+                            value={Math.round((userVolumes[contextMenu.userId] ?? 1) * 100)}
                             onChange={(e) => adjustVolume(contextMenu.userId, e.target.value / 100)}
                             style={{ width: '100%', accentColor: '#3BA55C', cursor: 'pointer' }}
                         />

@@ -4,3 +4,4 @@ websockets
 pydantic
 bcrypt
 python-multipart
+python-dotenv

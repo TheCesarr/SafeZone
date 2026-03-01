@@ -1,13 +1,13 @@
 @echo off
-echo Sunucuya Chat Fix Dosyasi Yukleniyor...
-echo Lutfen sifreyi giriniz: lzPCxWq2Ij9EdrUt
-scp routers/chat.py root@31.57.156.201:/root/SafeZone/routers/chat.py
-
+echo ============================================================
+echo  [!!] UYARI: Bu dosya artik KULLANILMIYOR.
+echo  Guncel deploy yontemi: Git Push + Sunucuda ./update_safezone.sh
+echo ============================================================
 echo.
-echo Sunucu Servisi Yeniden Baslatiliyor...
-echo Lutfen sifreyi tekrar giriniz (eger sorulursa):
-ssh root@31.57.156.201 "systemctl restart safezone"
-
+echo Yeni deploy adimlari:
+echo  1. Degisiklikleri commit et: git add . ve git commit -m "mesaj"
+echo  2. GitHub'a gonder: git push
+echo  3. Sunucuya SSH ile baglan: ssh root@31.57.156.201
+echo  4. Sunucuda guncelle: cd /root/SafeZone ve ./update_safezone.sh
 echo.
-echo Islem Tamamlandi!
 pause

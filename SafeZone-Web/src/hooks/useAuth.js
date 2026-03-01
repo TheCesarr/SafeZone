@@ -3,13 +3,14 @@ import { getUrl } from '../utils/api';
 import toast from '../utils/toast';
 
 export const useAuth = () => {
-    // State
-    const [authState, setAuthState] = useState({ token: null, user: null });
+    // State — initialize SYNCHRONOUSLY from localStorage to avoid login flash
+    const storedToken = localStorage.getItem('safezone_token');
+    const [authState, setAuthState] = useState({ token: storedToken, user: null });
     const [authMode, setAuthMode] = useState('login'); // login | register | reset
     const [authError, setAuthError] = useState(null);
-    const [isLoading, setIsLoading] = useState(true); // Initial load check
+    const [isLoading, setIsLoading] = useState(true); // Show loading spinner while verifying
 
-    // Check Local Storage on Mount
+    // Verify stored token on mount (background — UI already knows a token exists)
     useEffect(() => {
         const checkToken = async () => {
             const storedToken = localStorage.getItem('safezone_token');
@@ -36,14 +37,20 @@ export const useAuth = () => {
                             }
                         });
                     } else {
+                        // Token invalid — clear it and show login screen
                         localStorage.removeItem('safezone_token');
+                        setAuthState({ token: null, user: null });
                     }
-                } catch (e) { console.error("Verify Error", e); }
+                } catch (e) {
+                    console.error("Verify Error", e);
+                    // Network error: keep token, try again next time
+                }
             }
             setIsLoading(false);
         }
         checkToken();
     }, []);
+
 
     const handleLogin = async (email, password) => {
         setAuthError(null);

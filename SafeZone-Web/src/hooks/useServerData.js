@@ -8,6 +8,7 @@ export const useServerData = (authState) => {
     const [friends, setFriends] = useState([]);
     const [friendRequests, setFriendRequests] = useState({ incoming: [], outgoing: [] });
     const [serverMembers, setServerMembers] = useState([]);
+    const [serverRoles, setServerRoles] = useState([]); // Fix 5: Role list for current server
 
     // UI Selection State
     const [selectedServer, setSelectedServer] = useState(null);
@@ -45,6 +46,18 @@ export const useServerData = (authState) => {
         }
     }
 
+    const fetchRoles = async (serverId) => {
+        try {
+            const res = await fetch(getUrl(`/server/${serverId}/roles?token=${authState.token}`));
+            const data = await res.json();
+            if (data.status === 'success') {
+                setServerRoles(data.roles || []);
+            }
+        } catch (e) {
+            console.error("Roles fetch error:", e);
+        }
+    }
+
     const fetchFriends = async () => {
         if (!authState.token) return;
         try {
@@ -60,8 +73,10 @@ export const useServerData = (authState) => {
     const selectServer = (server) => {
         setSelectedServer(server);
         setSelectedChannel(null); // Reset channel when switching server
+        setServerRoles([]); // Reset roles for new server
         if (server) {
             fetchMembers(server.id);
+            fetchRoles(server.id); // Fix 5: Load roles for role assignment UI
             localStorage.setItem('safezone_last_server', server.id);
 
             // Auto-select first text channel (Discord behavior)
@@ -222,6 +237,7 @@ export const useServerData = (authState) => {
         friends, setFriends,
         friendRequests,
         serverMembers, setServerMembers,
+        serverRoles, // Fix 5: Exposed roles for ProfileCard
         selectedServer, selectServer,
         selectedChannel, setSelectedChannel,
 

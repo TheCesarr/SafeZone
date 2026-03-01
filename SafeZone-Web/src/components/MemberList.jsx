@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { getUrl } from '../utils/api';
 import ProfileCard from './ProfileCard';
 
-const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu }) => {
+const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu, serverRoles = [], currentUser, selectedServer, authToken }) => {
     const [selectedUserForProfile, setSelectedUserForProfile] = useState(null);
 
     // Group members: Online, Offline
@@ -210,6 +210,10 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                     user={selectedUserForProfile.user}
                     rect={selectedUserForProfile.rect}
                     colors={colors}
+                    serverRoles={serverRoles}
+                    currentUser={currentUser}
+                    selectedServer={selectedServer}
+                    authToken={authToken}
                     onClose={() => setSelectedUserForProfile(null)}
                 />
             )}
