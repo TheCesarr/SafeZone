@@ -4,7 +4,7 @@ import SoundManager from '../utils/SoundManager';
 import toast from '../utils/toast';
 import { NoiseSuppression } from '../audio/NoiseSuppression';
 
-export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedInputId, selectedOutputId, audioSettings) => {
+export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedInputId, selectedOutputId, audioSettings, keybinds = {}, isPTTMode = false) => {
     // Media & Connection Refs
     const localStream = useRef(null);
     const peerConnections = useRef({}); // { [uuid]: RTCPeerConnection }
@@ -592,6 +592,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
             await Promise.all(promises);
 
             setIsScreenSharing(true);
+            SoundManager.playScreenShare(true);
             const myId = authState.user?.username || uuid.current;
             setVoiceStates(prev => ({
                 ...prev,
@@ -630,6 +631,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         // No renegotiation needed — replaceTrack(null) doesn't change SDP structure.
         // Sending user_state is enough for peers to know sharing stopped.
         setIsScreenSharing(false);
+        SoundManager.playScreenShare(false);
         const myId = authState.user?.username || uuid.current;
         setVoiceStates(prev => ({
             ...prev,
@@ -637,6 +639,53 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         }));
         sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: isDeafened, is_screen_sharing: false });
     }
+
+    // --- PTT + GLOBAL HOTKEYS ---
+    useEffect(() => {
+        if (!activeVoiceChannel) return;
+
+        const handleKeyDown = (e) => {
+            // Skip if user is typing in an input/textarea
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+            // PTT: hold to talk
+            if (isPTTMode && keybinds.ptt && e.code === keybinds.ptt) {
+                if (e.repeat) return;
+                if (localStream.current) {
+                    localStream.current.getAudioTracks().forEach(t => t.enabled = true);
+                }
+                return;
+            }
+
+            // Mute shortcut
+            if (keybinds.mute && e.code === keybinds.mute) {
+                toggleMute();
+                return;
+            }
+
+            // Deafen shortcut
+            if (keybinds.deafen && e.code === keybinds.deafen) {
+                toggleDeafen();
+            }
+        };
+
+        const handleKeyUp = (e) => {
+            // PTT release: mute again
+            if (isPTTMode && keybinds.ptt && e.code === keybinds.ptt) {
+                if (localStream.current) {
+                    localStream.current.getAudioTracks().forEach(t => t.enabled = false);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [activeVoiceChannel, isPTTMode, keybinds, isMuted, isDeafened]);
 
 
     return {
@@ -647,6 +696,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         isMuted,
         isDeafened,
         isScreenSharing,
+        isPTTMode,
         remoteStreams,      // Microphone Streams { [userId]: MediaStream }
         remoteScreenStreams,// Screen Streams
         setConnectedUsers,

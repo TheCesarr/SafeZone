@@ -19,11 +19,19 @@ const SettingsPanel = ({
     selectedOutputId,
     setSelectedOutputId,
     audioSettings,
-    setAudioSettings
+    setAudioSettings,
+    // Keybind props
+    keybinds = {},
+    setKeybind,
+    clearKeybind,
+    isPTTMode = false,
+    setIsPTTMode,
+    getFriendlyName
 }) => {
     if (!show) return null;
 
     const [activeTab, setActiveTab] = useState('profile');
+    const [capturingKeybind, setCapturingKeybind] = useState(null); // 'ptt' | 'mute' | 'deafen' | null
 
     // Profile Edit State
     const [editDisplayName, setEditDisplayName] = useState(authState.user?.display_name || "");
@@ -187,7 +195,7 @@ const SettingsPanel = ({
             {/* SIDEBAR */}
             <div style={{ width: '250px', background: colors.sidebar, padding: '60px 20px 20px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: '12px', fontWeight: 'bold', color: colors?.textMuted || '#aaa', marginBottom: '10px', paddingLeft: '10px' }}>KULLANICI AYARLARI</div>
-                {['profile', 'voice', 'appearance'].map(tab => (
+                {['profile', 'voice', 'appearance', 'keybinds'].map(tab => (
                     <div
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -200,7 +208,7 @@ const SettingsPanel = ({
                             color: activeTab === tab ? (colors?.text || '#fff') : (colors?.textMuted || '#b9bbbe')
                         }}
                     >
-                        {tab === 'profile' ? 'Profilim' : tab === 'voice' ? 'Ses ve Görüntü' : 'Görünüm'}
+                        {tab === 'profile' ? 'Profilim' : tab === 'voice' ? 'Ses ve Görüntü' : tab === 'appearance' ? 'Görünüm' : 'Tuş Atamaları'}
                     </div>
                 ))}
 
@@ -215,7 +223,7 @@ const SettingsPanel = ({
             <div style={{ flex: 1, padding: '60px 40px', overflowY: 'auto' }}>
                 <div style={{ maxWidth: '600px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h2 style={{ color: colors?.text || '#fff' }}>{activeTab === 'profile' ? 'Profilim' : activeTab === 'voice' ? 'Ses Ayarları' : 'Görünüm'}</h2>
+                        <h2 style={{ color: colors?.text || '#fff' }}>{activeTab === 'profile' ? 'Profilim' : activeTab === 'voice' ? 'Ses Ayarları' : activeTab === 'keybinds' ? 'Tuş Atamaları' : 'Görünüm'}</h2>
                         <button onClick={onClose} style={{ padding: '8px 16px', background: 'transparent', border: `1px solid ${colors?.text || '#fff'}`, color: colors?.text || '#fff', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>X</button>
                     </div>
 
@@ -369,6 +377,74 @@ const SettingsPanel = ({
                                 {/* Hidden Audio for Loopback */}
                                 <audio ref={testAudioRef} style={{ display: 'none' }} />
                             </div>
+                        </div>
+                    )}
+
+                    {/* ===== TUŞ ATAMALAR TAB ===== */}
+                    {activeTab === 'keybinds' && (
+                        <div onKeyDown={(e) => {
+                            if (!capturingKeybind) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setKeybind?.(capturingKeybind, e.code);
+                            setCapturingKeybind(null);
+                        }} tabIndex={-1} style={{ outline: 'none' }}>
+
+                            {/* PTT Mode Toggle */}
+                            <div style={{ background: colors.card, padding: '20px', borderRadius: '8px', marginBottom: '16px' }}>
+                                <div style={{ fontWeight: 'bold', color: colors.text, marginBottom: '8px' }}>Mikrofon Modu</div>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    {[{ id: false, label: '🎙️ Ses Aktivitesi (VAD)' }, { id: true, label: '🖱️ Bas-Konuş (PTT)' }].map(opt => (
+                                        <button key={String(opt.id)} onClick={() => setIsPTTMode?.(opt.id)} style={{
+                                            flex: 1, padding: '12px', borderRadius: '8px', cursor: 'pointer',
+                                            border: `2px solid ${isPTTMode === opt.id ? colors.accent : 'rgba(255,255,255,0.1)'}`,
+                                            background: isPTTMode === opt.id ? `${colors.accent}22` : 'transparent',
+                                            color: isPTTMode === opt.id ? colors.accent : colors.textMuted,
+                                            fontWeight: isPTTMode === opt.id ? 'bold' : 'normal',
+                                            transition: 'all 0.2s ease'
+                                        }}>{opt.label}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Keybind Rows */}
+                            {[
+                                { action: 'ptt', label: 'Bas-Konuş Tuşu', icon: '🎙️', hidden: !isPTTMode },
+                                { action: 'mute', label: 'Mikrofon Aç/Kapat', icon: '🔇', hidden: false },
+                                { action: 'deafen', label: 'Sesi Kapat (Sağırlaştır)', icon: '🎧', hidden: false },
+                            ].filter(r => !r.hidden).map(row => (
+                                <div key={row.action} style={{ background: colors.card, padding: '16px 20px', borderRadius: '8px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ fontSize: '18px' }}>{row.icon}</span>
+                                        <span style={{ color: colors.text, fontWeight: '500' }}>{row.label}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <div
+                                            onClick={() => setCapturingKeybind(capturingKeybind === row.action ? null : row.action)}
+                                            style={{
+                                                minWidth: '120px', padding: '8px 14px', borderRadius: '6px', textAlign: 'center',
+                                                background: capturingKeybind === row.action ? `${colors.accent}33` : 'rgba(0,0,0,0.25)',
+                                                border: `2px solid ${capturingKeybind === row.action ? colors.accent : 'rgba(255,255,255,0.15)'}`,
+                                                color: capturingKeybind === row.action ? colors.accent : (keybinds[row.action] ? colors.text : colors.textMuted),
+                                                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                                                animation: capturingKeybind === row.action ? 'noisePulse 1s ease infinite' : 'none',
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                        >
+                                            {capturingKeybind === row.action ? '🔴 Tuşa Bas...' : (getFriendlyName?.(keybinds[row.action]) || 'Atanmamış')}
+                                        </div>
+                                        {keybinds[row.action] && (
+                                            <button onClick={() => clearKeybind?.(row.action)} style={{ background: 'rgba(237,66,69,0.15)', border: '1px solid rgba(237,66,69,0.4)', color: '#ed4245', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {capturingKeybind && (
+                                <div style={{ textAlign: 'center', color: colors.textMuted, fontSize: '12px', marginTop: '8px' }}>
+                                    Atamak istediğin tuşa bas. İptal için <strong onClick={() => setCapturingKeybind(null)} style={{ cursor: 'pointer', color: colors.accent }}>tıkla</strong>.
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

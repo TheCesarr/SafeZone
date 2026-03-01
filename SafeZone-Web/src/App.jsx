@@ -24,6 +24,7 @@ import { useServerData } from './hooks/useServerData';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useChat } from './hooks/useChat';
 import { useLobby } from './hooks/useLobby';
+import { useKeybinds } from './hooks/useKeybinds';
 
 import AdminDashboard from './components/AdminDashboard'; // Import AdminDashboard
 
@@ -59,6 +60,7 @@ function App() {
 
   const serverData = useServerData(authState);
   const unread = useUnread();
+  const { keybinds, setKeybind, clearKeybind, isPTTMode, setIsPTTMode, getFriendlyName } = useKeybinds();
 
   // Function to dynamically enrich local user state from global lobby updates
   const updateGlobalUsers = (usersArray) => {
@@ -102,7 +104,7 @@ function App() {
       unread.incrementChannelUnread(selectedChannelRef.current.id);
     }
   });
-  const webrtc = useWebRTC(authState, uuid, roomWs, chat.handleIncomingMessage, selectedInputId, selectedOutputId, audioSettings);
+  const webrtc = useWebRTC(authState, uuid, roomWs, chat.handleIncomingMessage, selectedInputId, selectedOutputId, audioSettings, keybinds, isPTTMode);
 
   // --- 3. UI STATE (Specific to App Layout) ---
   const [showCreateServer, setShowCreateServer] = useState(false)
@@ -774,6 +776,12 @@ function App() {
         setSelectedOutputId={setSelectedOutputId}
         audioSettings={audioSettings}
         setAudioSettings={setAudioSettings}
+        keybinds={keybinds}
+        setKeybind={setKeybind}
+        clearKeybind={clearKeybind}
+        isPTTMode={isPTTMode}
+        setIsPTTMode={setIsPTTMode}
+        getFriendlyName={getFriendlyName}
       />
 
       {
