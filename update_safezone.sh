@@ -15,9 +15,9 @@ echo "📦 Paketler guncelleniyor..."
 cd SafeZone-Server
 source venv/bin/activate
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
+    pip install -r requirements.txt --break-system-packages
 else
-    pip install fastapi uvicorn websockets pydantic bcrypt python-multipart
+    pip install fastapi uvicorn websockets pydantic bcrypt python-multipart --break-system-packages
 fi
 
 # 3. Restart Service
