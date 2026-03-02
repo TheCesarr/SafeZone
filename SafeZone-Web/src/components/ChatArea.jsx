@@ -45,7 +45,8 @@ const ChatArea = ({
     authToken = null,
     setMessages,
     serverRoles = [],
-    selectedServer = null
+    selectedServer = null,
+    myPermissions = undefined
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
