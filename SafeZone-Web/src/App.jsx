@@ -850,8 +850,8 @@ function App() {
         myPermissions={serverData.selectedServer?.my_permissions}
         onKick={(u) => { serverData.kickMember(u.username); setUserContextMenu(null); }}
         onBan={(u) => { serverData.banMember(u.username); setUserContextMenu(null); }}
-        onAssignRole={(u, roleId) => { serverData.assignRole(u.username, roleId); }}
-        onUnassignRole={(u, roleId) => { serverData.unassignRole(u.username, roleId); }}
+        onAssignRole={(u, roleId) => { serverData.assignRole(u, roleId); }}
+        onUnassignRole={(u, roleId) => { serverData.unassignRole(u, roleId); }}
         serverRoles={serverData.serverRoles}
       />
 

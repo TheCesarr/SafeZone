@@ -207,15 +207,16 @@ export const useServerData = (authState) => {
         } catch (e) { toast.error(e.message); }
     };
 
-    const assignRole = async (targetUsername, roleId) => {
+    const assignRole = async (targetUser, roleId) => {
         if (!selectedServer) return;
         try {
-            const member = serverMembers.find(m => m.username === targetUsername);
-            if (!member) return;
+            // Accept either a user object or a username string (backwards compat)
+            const userId = typeof targetUser === 'object' ? targetUser.id : serverMembers.find(m => m.username === targetUser)?.id;
+            if (!userId) { toast.error('Kullanıcı bulunamadı'); return; }
             const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${roleId}/assign`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authState.token, user_id: member.id })
+                body: JSON.stringify({ token: authState.token, user_id: userId })
             });
             const data = await res.json();
             if (data.status === 'success') {
@@ -225,15 +226,15 @@ export const useServerData = (authState) => {
         } catch (e) { toast.error(e.message); }
     };
 
-    const unassignRole = async (targetUsername, roleId) => {
+    const unassignRole = async (targetUser, roleId) => {
         if (!selectedServer) return;
         try {
-            const member = serverMembers.find(m => m.username === targetUsername);
-            if (!member) return;
+            const userId = typeof targetUser === 'object' ? targetUser.id : serverMembers.find(m => m.username === targetUser)?.id;
+            if (!userId) { toast.error('Kullanıcı bulunamadı'); return; }
             const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${roleId}/unassign`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authState.token, user_id: member.id })
+                body: JSON.stringify({ token: authState.token, user_id: userId })
             });
             const data = await res.json();
             if (data.status === 'success') {
