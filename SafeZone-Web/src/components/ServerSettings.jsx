@@ -243,63 +243,80 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
                                 </div>
 
                                 {/* Role Edit */}
-                                <div style={{ flex: 1, backgroundColor: bgColor, padding: '20px' }}>
+                                <div style={{ flex: 1, backgroundColor: bgColor, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                                     {selectedRole ? (
                                         <>
-                                            <div style={{ marginBottom: '20px' }}>
-                                                <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>ROL ADI</label>
-                                                <input
-                                                    value={editRoleName}
-                                                    onChange={(e) => setEditRoleName(e.target.value)}
-                                                    style={{ width: '100%', padding: '10px', backgroundColor: cardColor, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '4px', outline: 'none' }}
-                                                />
-                                            </div>
-                                            <div style={{ marginBottom: '20px' }}>
-                                                <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>ROL RENGİ</label>
-                                                <div style={{ display: 'flex', gap: '10px' }}>
-                                                    <input type="color" value={editRoleColor} onChange={(e) => setEditRoleColor(e.target.value)} style={{ width: '50px', height: '40px', border: 'none', padding: 0, backgroundColor: 'transparent' }} />
-                                                    <input value={editRoleColor} onChange={(e) => setEditRoleColor(e.target.value)} style={{ padding: '10px', backgroundColor: cardColor, border: `1px solid ${borderColor}`, color: textColor }} />
+                                            {/* Scrollable top section */}
+                                            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                                                <div style={{ marginBottom: '20px' }}>
+                                                    <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>ROL ADI</label>
+                                                    <input
+                                                        value={editRoleName}
+                                                        onChange={(e) => setEditRoleName(e.target.value)}
+                                                        style={{ width: '100%', padding: '10px', backgroundColor: cardColor, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '4px', outline: 'none', boxSizing: 'border-box' }}
+                                                    />
+                                                </div>
+                                                <div style={{ marginBottom: '20px' }}>
+                                                    <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>ROL RENGI</label>
+                                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                        <input type="color" value={editRoleColor} onChange={(e) => setEditRoleColor(e.target.value)} style={{ width: '50px', height: '40px', border: 'none', padding: 0, backgroundColor: 'transparent', cursor: 'pointer' }} />
+                                                        <input value={editRoleColor} onChange={(e) => setEditRoleColor(e.target.value)} style={{ padding: '10px', backgroundColor: cardColor, border: `1px solid ${borderColor}`, color: textColor, borderRadius: '4px', outline: 'none' }} />
+                                                    </div>
+                                                </div>
+
+                                                {/* PERMISSIONS TOGGLES */}
+                                                <div style={{ marginBottom: '10px' }}>
+                                                    <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '15px' }}>YETKILER</label>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                                        {PERMISSIONS.map(perm => {
+                                                            const isChecked = (editPermissions & perm.value) === perm.value;
+                                                            return (
+                                                                <div key={perm.value} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
+                                                                    <div>
+                                                                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: perm.color || textColor, marginBottom: '4px' }}>{perm.label}</div>
+                                                                        <div style={{ fontSize: '12px', color: mutedColor }}>{perm.desc}</div>
+                                                                    </div>
+                                                                    <div
+                                                                        onClick={() => togglePermission(perm.value)}
+                                                                        style={{
+                                                                            width: '40px', height: '20px', borderRadius: '10px',
+                                                                            backgroundColor: isChecked ? '#3ba55c' : '#72767d',
+                                                                            position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s',
+                                                                            flexShrink: 0, marginLeft: '16px'
+                                                                        }}
+                                                                    >
+                                                                        <div style={{
+                                                                            width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff',
+                                                                            position: 'absolute', top: '2px', left: isChecked ? '22px' : '2px',
+                                                                            transition: 'left 0.2s'
+                                                                        }}></div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            {/* PERMISSIONS CHECKBOXES */}
-                                            <div style={{ marginBottom: '20px' }}>
-                                                <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '15px' }}>YETKİLER</label>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                                    {PERMISSIONS.map(perm => {
-                                                        const isChecked = (editPermissions & perm.value) === perm.value;
-                                                        return (
-                                                            <div key={perm.value} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
-                                                                <div>
-                                                                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: perm.color || textColor, marginBottom: '4px' }}>{perm.label}</div>
-                                                                    <div style={{ fontSize: '12px', color: mutedColor }}>{perm.desc}</div>
-                                                                </div>
-                                                                <div
-                                                                    onClick={() => togglePermission(perm.value)}
-                                                                    style={{
-                                                                        width: '40px', height: '20px', borderRadius: '10px',
-                                                                        backgroundColor: isChecked ? '#3ba55c' : '#72767d',
-                                                                        position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s'
-                                                                    }}
-                                                                >
-                                                                    <div style={{
-                                                                        width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff',
-                                                                        position: 'absolute', top: '2px', left: isChecked ? '22px' : '2px',
-                                                                        transition: 'left 0.2s'
-                                                                    }}></div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '20px', display: 'flex', gap: '10px' }}>
-                                                <button onClick={handleSaveRole} style={{ padding: '10px 20px', backgroundColor: '#3ba55c', color: '#fff', border: 'none', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer' }}>Kaydet</button>
-                                                <button onClick={handleDeleteRole} style={{ padding: '10px 20px', backgroundColor: 'transparent', color: '#ed4245', border: '1px solid #ed4245', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer' }}>Sil</button>
+                                            {/* Sticky action buttons at bottom */}
+                                            <div style={{ borderTop: `2px solid ${borderColor}`, padding: '16px 20px', display: 'flex', gap: '10px', backgroundColor: sidebarColor, flexShrink: 0 }}>
+                                                <button
+                                                    onClick={handleSaveRole}
+                                                    style={{ padding: '10px 24px', backgroundColor: '#3ba55c', color: '#fff', border: 'none', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
+                                                >
+                                                    💾 Kaydet
+                                                </button>
+                                                <button
+                                                    onClick={handleDeleteRole}
+                                                    style={{ padding: '10px 24px', backgroundColor: 'transparent', color: '#ed4245', border: '1px solid #ed4245', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
+                                                >
+                                                    🗑️ Rolü Sil
+                                                </button>
                                             </div>
                                         </>
-                                    ) : <div style={{ color: mutedColor }}>Düzenlemek için bir rol seç.</div>}
+                                    ) : (
+                                        <div style={{ padding: '20px', color: mutedColor }}>Düzenlemek için bir rol seç.</div>
+                                    )}
                                 </div>
                             </div>
                         </div>
