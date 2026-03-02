@@ -21,7 +21,7 @@ const PERMISSIONS = [
     { value: 32768, label: "Yönetici (Administrator)", desc: "Diğer tüm kısıtlamaları ezer. Bu yetkiye sahip rol her şeyi yapabilir.", color: "#ed4245" }
 ];
 
-const ServerSettings = ({ server, onClose, authState, colors }) => {
+const ServerSettings = ({ server, onClose, authState, colors, onRolesChanged }) => {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roles'
     // Server Edit State
     const [serverName, setServerName] = useState(server.name);
@@ -98,7 +98,10 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
                 body: JSON.stringify({ token: authState.token, name: "yeni rol", color: "#99AAB5", permissions: 0 })
             });
             const data = await res.json();
-            if (data.status === 'success') fetchRoles(data.role ? data.role.id : null);
+            if (data.status === 'success') {
+                fetchRoles(data.role ? data.role.id : null);
+                onRolesChanged && onRolesChanged(); // ✅ sync globally
+            }
             else toast.error(data.message);
         } catch (e) { toast.error(e.message); }
     };
@@ -115,6 +118,7 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
             if (data.status === 'success') {
                 setRoles(prev => prev.map(r => r.id === selectedRole.id ? { ...r, name: editRoleName, color: editRoleColor } : r));
                 toast.success("Rol kaydedildi!");
+                onRolesChanged && onRolesChanged(); // ✅ sync globally
             } else toast.error(data.message);
         } catch (e) { toast.error(e.message); }
     };
@@ -125,6 +129,7 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
             await fetch(getUrl(`/server/${server.id}/roles/${selectedRole.id}?token=${authState.token}`), { method: 'DELETE' });
             setSelectedRole(null);
             fetchRoles();
+            onRolesChanged && onRolesChanged(); // ✅ sync globally
         } catch (e) { toast.error(e.message); }
     };
 

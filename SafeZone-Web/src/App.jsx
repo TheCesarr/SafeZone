@@ -809,6 +809,10 @@ function App() {
             onClose={() => setShowServerSettings(false)}
             authState={authState}
             colors={colors}
+            onRolesChanged={() => {
+              serverData.fetchRoles(serverData.selectedServer?.id);
+              serverData.fetchMembers(serverData.selectedServer?.id);
+            }}
           />
         )
       }
