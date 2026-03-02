@@ -1,11 +1,36 @@
 import React from 'react';
 
-export const ServerContextMenu = ({ contextMenu, onDelete }) => {
-    if (!contextMenu) return null;
+export const ServerContextMenu = ({ contextMenu, onDelete, onLeave, onShare, isOwner }) => {
+    if (!contextMenu || !contextMenu.serverId) return null;
     return (
-        <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '4px', padding: '5px', zIndex: 20000, boxShadow: '0 5px 15px rgba(0,0,0,0.5)' }}>
-            <div onClick={() => onDelete(contextMenu.serverId)} style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#f04747', color: '#fff' } }}>
-                Sunucuyu Sil / Ayrıl
+        <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '4px', padding: '5px', zIndex: 20000, boxShadow: '0 5px 15px rgba(0,0,0,0.5)', minWidth: '150px' }}>
+            <div onClick={() => onShare(contextMenu.serverId)} style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' } }}>
+                🔗 Sunucuyu Paylaş
+            </div>
+            <div style={{ height: '1px', background: '#333', margin: '4px 0' }} />
+            {isOwner ? (
+                <div onClick={() => onDelete(contextMenu.serverId)} style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#f04747', color: '#fff' } }}>
+                    🗑️ Sunucuyu Sil
+                </div>
+            ) : (
+                <div onClick={() => onLeave(contextMenu.serverId)} style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#f04747', color: '#fff' } }}>
+                    🚪 Sunucudan Ayrıl
+                </div>
+            )}
+        </div>
+    );
+};
+
+export const ChannelContextMenu = ({ contextMenu, onDelete, onEdit }) => {
+    if (!contextMenu || !contextMenu.channelId) return null;
+    return (
+        <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '4px', padding: '5px', zIndex: 20000, boxShadow: '0 5px 15px rgba(0,0,0,0.5)', minWidth: '150px' }}>
+            <div onClick={() => onEdit(contextMenu.channelId, contextMenu.channel)} style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' } }}>
+                ✏️ Odayı Düzenle
+            </div>
+            <div style={{ height: '1px', background: '#333', margin: '4px 0' }} />
+            <div onClick={() => onDelete(contextMenu.channelId)} style={{ padding: '8px 12px', color: '#f04747', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#f04747', color: '#fff' } }}>
+                🗑️ Odayı Sil
             </div>
         </div>
     );

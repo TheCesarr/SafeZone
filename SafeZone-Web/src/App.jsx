@@ -9,7 +9,7 @@ import VoiceRoom from './components/VoiceRoom';
 import FriendsDashboard from './components/FriendsDashboard';
 import ServerSettings from './components/ServerSettings';
 import SettingsPanel from './components/SettingsPanel';
-import { ServerContextMenu, UserContextMenu, MessageContextMenu } from './components/ContextMenus';
+import { ServerContextMenu, UserContextMenu, MessageContextMenu, ChannelContextMenu } from './components/ContextMenus';
 import Modal from './components/Modal';
 import { getTheme, getPaletteName } from './utils/themes';
 import StreamOverlay from './components/StreamOverlay';
@@ -332,6 +332,25 @@ function App() {
 
     // Force Menu Update (Hack)
     setUserContextMenu(prev => ({ ...prev }));
+  };
+
+  const handleShareServer = (serverId) => {
+    const srv = serverData.myServers.find(s => s.id === serverId);
+    if (srv && srv.invite_code) {
+      navigator.clipboard.writeText(srv.invite_code);
+      toast.success("Sunucu davet kodu panoya kopyalandı!");
+    } else {
+      toast.error("Davet kodu bulunamadı!");
+    }
+    setContextMenu(null);
+  };
+
+  const handleEditChannelMenu = async (channelId, channelObj) => {
+    const newName = window.prompt("Yeni kanal adını girin:", channelObj?.name || "");
+    if (newName && newName.trim() !== "" && newName !== channelObj?.name) {
+      await serverData.handleRenameChannel(channelId, newName.trim());
+    }
+    setContextMenu(null);
   };
 
   // Close menus
@@ -796,10 +815,23 @@ function App() {
       }
 
       {/* CONTEXT MENUS */}
-      <ServerContextMenu
-        contextMenu={contextMenu}
-        onDelete={serverData.handleLeaveServer}
-      />
+      {contextMenu?.serverId && (
+        <ServerContextMenu
+          contextMenu={contextMenu}
+          onDelete={(id) => { serverData.handleDeleteServer(id); setContextMenu(null); }}
+          onLeave={(id) => { serverData.handleLeaveServer(id); setContextMenu(null); }}
+          onShare={handleShareServer}
+          isOwner={serverData.myServers.find(s => s.id === contextMenu.serverId)?.owner_id === authState.user?.id || authState.user?.is_sysadmin}
+        />
+      )}
+
+      {contextMenu?.channelId && (
+        <ChannelContextMenu
+          contextMenu={contextMenu}
+          onDelete={(id) => { serverData.handleDeleteChannel(id); setContextMenu(null); }}
+          onEdit={handleEditChannelMenu}
+        />
+      )}
 
       <UserContextMenu
         contextMenu={userContextMenu}

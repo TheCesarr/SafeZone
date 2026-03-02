@@ -134,15 +134,7 @@ export const useServerData = (authState) => {
     const handleLeaveServer = async (serverId) => {
         if (!window.confirm("Bu sunucudan ayrılmak istiyor musun?")) return;
         try {
-            // Check if owner logic should be handled by UI or Backend? 
-            // Usually we call /server/leave, if owner it fails or we call /server/delete.
-            // Let's check permissions locally if possible or just try leave.
-            const server = myServers.find(s => s.id === serverId);
-            const isOwner = server?.owner_id === authState.user.id;
-
-            const endpoint = isOwner ? '/server/delete' : '/server/leave';
-
-            const res = await fetch(getUrl(endpoint), {
+            const res = await fetch(getUrl('/server/leave'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: authState.token, server_id: serverId })
@@ -157,7 +149,27 @@ export const useServerData = (authState) => {
                 return false;
             }
         } catch (e) { console.error(e); }
-    }
+    };
+
+    const handleDeleteServer = async (serverId) => {
+        if (!window.confirm("Bu sunucuyu silmek istediğine emin misin? Bu işlem geri alınamaz!")) return;
+        try {
+            const res = await fetch(getUrl('/server/delete'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, server_id: serverId })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                setSelectedServer(null);
+                await fetchServers();
+                return true;
+            } else {
+                toast.error(data.message);
+                return false;
+            }
+        } catch (e) { console.error(e); }
+    };
 
     const handleCreateChannel = async (server_id, channelName, type) => {
         try {
@@ -184,6 +196,61 @@ export const useServerData = (authState) => {
             return false;
         }
     }
+
+    const handleDeleteChannel = async (channelId) => {
+        if (!window.confirm("Bu odayı silmek istediğine emin misin?")) return false;
+        try {
+            const res = await fetch(getUrl('/channel/delete'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: authState.token,
+                    channel_id: channelId
+                })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                if (selectedChannel?.id === channelId) setSelectedChannel(null);
+                fetchServers();
+                return true;
+            } else {
+                toast.error(data.message);
+                return false;
+            }
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
+    };
+
+    const handleRenameChannel = async (channelId, newName) => {
+        if (!newName || newName.trim() === '') return false;
+        try {
+            const res = await fetch(getUrl('/channel/rename'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: authState.token,
+                    channel_id: channelId,
+                    new_name: newName.trim()
+                })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                if (selectedChannel?.id === channelId) {
+                    setSelectedChannel(prev => ({ ...prev, name: newName.trim() }));
+                }
+                fetchServers();
+                return true;
+            } else {
+                toast.error(data.message);
+                return false;
+            }
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
+    };
 
     // --- FRIENDS ---
     const addFriend = async (friendTag) => {
@@ -248,7 +315,10 @@ export const useServerData = (authState) => {
         handleCreateServer,
         handleJoinServer,
         handleLeaveServer,
+        handleDeleteServer,
         handleCreateChannel,
+        handleDeleteChannel,
+        handleRenameChannel,
 
         addFriend,
         removeFriend,

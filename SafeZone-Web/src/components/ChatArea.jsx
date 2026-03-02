@@ -48,12 +48,58 @@ const ChatArea = ({
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
+    const inputRef = useRef(null);
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
+    const emojiPickerRef = useRef(null);
     const [mentionQuery, setMentionQuery] = React.useState(null);
     const [mentionSuggestions, setMentionSuggestions] = React.useState([]);
     const [selectedUserForProfile, setSelectedUserForProfile] = React.useState(null);
+    const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
     const prevScrollHeight = useRef(0);
+
+    // Close emoji picker on outside click
+    React.useEffect(() => {
+        if (!showEmojiPicker) return;
+        const handler = (e) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+                setShowEmojiPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showEmojiPicker]);
+
+    // Emoji text shortcut map
+    const EMOJI_SHORTCUTS = {
+        ':)': '😊', ':-)': '😊', ':D': '😁', ':-D': '😁',
+        ':P': '😛', ':-P': '😛', ';)': '😉', ';-)': '😉',
+        ':o': '😮', ':-o': '😮', ':O': '😮',
+        ':(': '😢', ':-(': '😢', ":'(": '😭',
+        ':|\'': '😐', ':|': '😐', ':-|': '😐',
+        '>:(': '😠', '>:-(': '😠',
+        '<3': '❤️', '</3': '💔',
+        ':*': '😘', ':-*': '😘',
+        'B)': '😎', 'B-)': '😎',
+        ':+1:': '👍', ':-1:': '👎',
+        ':fire:': '🔥', ':ok:': '👌', ':wave:': '👋',
+        ':100:': '💯', ':star:': '⭐', ':heart:': '❤️',
+        ':laugh:': '😂', ':cry:': '😭', ':wow:': '😮',
+        ':angry:': '😡', ':cool:': '😎', ':wink:': '😉',
+    };
+
+    const replaceEmojiShortcuts = (text) => {
+        // Replace patterns that end with a space or end of string
+        let result = text;
+        const sorted = Object.keys(EMOJI_SHORTCUTS).sort((a, b) => b.length - a.length);
+        for (const shortcut of sorted) {
+            // Only replace when followed by space or at end
+            const escaped = shortcut.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(?<=[^\\S]|^)(${escaped})(?=\\s|$)`, 'g');
+            result = result.replace(regex, EMOJI_SHORTCUTS[shortcut]);
+        }
+        return result;
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -693,13 +739,17 @@ const ChatArea = ({
                         placeholder={`Mesaj gönder: ${selectedDM ? '@' + selectedDM.username : (selectedChannel ? '#' + selectedChannel.name : '')}`}
                         value={inputText}
                         onChange={(e) => {
-                            handleTyping(e);
+                            let val = e.target.value;
+                            // Auto-replace emoji shortcuts when a space is typed after them
+                            if (val.endsWith(' ')) {
+                                val = replaceEmojiShortcuts(val);
+                            }
+                            setInputText(val);
+                            handleTyping({ target: { value: val } });
                             // @mention autocomplete detection
-                            const val = e.target.value;
                             const lastAt = val.lastIndexOf('@');
                             if (lastAt !== -1 && lastAt === val.length - 1) {
-                                // Just typed @
-                                setMentionQuery('')
+                                setMentionQuery('');
                                 setMentionSuggestions(onlineMembers.filter(m => m.username !== currentUser.username));
                             } else if (lastAt !== -1) {
                                 const query = val.slice(lastAt + 1).split(' ')[0];
@@ -720,16 +770,17 @@ const ChatArea = ({
                                 setMentionQuery(null);
                             }
                         }}
+
                         onKeyDown={e => {
                             if (e.key === 'Escape') {
                                 setMentionSuggestions([]);
                                 setMentionQuery(null);
+                                setShowEmojiPicker(false);
                                 if (replyingTo) setReplyingTo(null);
                             }
                             if (e.key === 'Enter') {
                                 e.preventDefault();
                                 if (mentionSuggestions.length > 0) {
-                                    // Enter selects first autocomplete suggestion
                                     const member = mentionSuggestions[0];
                                     const lastAt = inputText.lastIndexOf('@');
                                     const newText = inputText.slice(0, lastAt) + `@${member.username} `;
@@ -738,7 +789,6 @@ const ChatArea = ({
                                     setMentionQuery(null);
                                     return;
                                 }
-
                                 if (inputText.trim() || attachment) {
                                     if (selectedDM) onSendDM();
                                     else {
@@ -749,7 +799,65 @@ const ChatArea = ({
                             }
                         }}
                         style={{ color: colors?.text || '#fff' }}
+                        ref={inputRef}
                     />
+
+                    {/* Emoji Picker Button */}
+                    <div ref={emojiPickerRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <span
+                            onClick={() => setShowEmojiPicker(p => !p)}
+                            title="Emoji"
+                            style={{
+                                cursor: 'pointer',
+                                fontSize: '20px',
+                                marginLeft: '8px',
+                                color: showEmojiPicker ? (colors?.accent || '#5865F2') : (colors?.textMuted || 'rgba(255,255,255,0.3)'),
+                                transition: 'color 0.15s, transform 0.15s',
+                                userSelect: 'none',
+                                lineHeight: 1,
+                            }}
+                            onMouseEnter={e => { e.target.style.color = colors?.accent || '#5865F2'; e.target.style.transform = 'scale(1.15)'; }}
+                            onMouseLeave={e => { e.target.style.color = showEmojiPicker ? (colors?.accent || '#5865F2') : (colors?.textMuted || 'rgba(255,255,255,0.3)'); e.target.style.transform = 'scale(1)'; }}
+                        >😊</span>
+
+                        {showEmojiPicker && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '44px',
+                                right: '0',
+                                zIndex: 9999,
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                                borderRadius: '12px',
+                                overflow: 'hidden',
+                            }}>
+                                <EmojiPicker
+                                    onEmojiClick={(emojiData) => {
+                                        const emoji = emojiData.emoji;
+                                        const el = inputRef.current;
+                                        if (el) {
+                                            const start = el.selectionStart ?? inputText.length;
+                                            const end = el.selectionEnd ?? inputText.length;
+                                            const newText = inputText.slice(0, start) + emoji + inputText.slice(end);
+                                            setInputText(newText);
+                                            // Restore focus and move cursor after emoji
+                                            setTimeout(() => {
+                                                el.focus();
+                                                const pos = start + emoji.length;
+                                                el.setSelectionRange(pos, pos);
+                                            }, 0);
+                                        } else {
+                                            setInputText(prev => prev + emoji);
+                                        }
+                                        setShowEmojiPicker(false);
+                                    }}
+                                    theme={colors?.background?.startsWith('#f') ? 'light' : 'dark'}
+                                    searchPlaceholder="Emoji ara..."
+                                    height={380}
+                                    width={320}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
