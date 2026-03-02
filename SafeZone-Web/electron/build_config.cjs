@@ -1,4 +1,4 @@
 module.exports = {
-  type: 'client',
-  adminSecret: ''
+  type: 'admin',
+  adminSecret: 'SAFEZONE_ADMIN_V2_SECRET_KEY_99887766'
 };

@@ -114,6 +114,7 @@ function App() {
   const [modalInput, setModalInput] = useState("")
 
   const [showChannelCreateModal, setShowChannelCreateModal] = useState(false)
+  const [editingChannel, setEditingChannel] = useState(null)
   const [showChannelRenameModal, setShowChannelRenameModal] = useState(false)
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelType, setNewChannelType] = useState('text')
@@ -345,11 +346,8 @@ function App() {
     setContextMenu(null);
   };
 
-  const handleEditChannelMenu = async (channelId, channelObj) => {
-    const newName = window.prompt("Yeni kanal adını girin:", channelObj?.name || "");
-    if (newName && newName.trim() !== "" && newName !== channelObj?.name) {
-      await serverData.handleRenameChannel(channelId, newName.trim());
-    }
+  const handleEditChannelMenu = (channelId, channelObj) => {
+    setEditingChannel({ id: channelId, name: channelObj?.name || "" });
     setContextMenu(null);
   };
 
@@ -620,6 +618,7 @@ function App() {
                 replyingTo={chat.replyingTo}
                 setReplyingTo={chat.setReplyingTo}
                 activeEmojiPickerId={chat.activeEmojiPickerId}
+                myPermissions={serverData.selectedServer?.my_permissions}
                 setActiveEmojiPickerId={chat.setActiveEmojiPickerId}
                 emojiPickerPosition={chat.emojiPickerPosition}
                 setEmojiPickerPosition={chat.setEmojiPickerPosition}
@@ -830,6 +829,7 @@ function App() {
           contextMenu={contextMenu}
           onDelete={(id) => { serverData.handleDeleteChannel(id); setContextMenu(null); }}
           onEdit={handleEditChannelMenu}
+          myPermissions={serverData.selectedServer?.my_permissions}
         />
       )}
 
@@ -843,11 +843,18 @@ function App() {
         onVolumeChange={handleRemoteVolume}
         volume={userContextMenu?.user && webrtc.remoteAudioRefs.current[userContextMenu.user.uuid || userContextMenu.user.username]?.[0]?.volume}
         isMuted={userContextMenu?.user && webrtc.remoteAudioRefs.current[userContextMenu.user.uuid || userContextMenu.user.username]?.[0]?.muted}
+        myPermissions={serverData.selectedServer?.my_permissions}
+        onKick={(u) => { serverData.kickMember(u.username); setUserContextMenu(null); }}
+        onBan={(u) => { serverData.banMember(u.username); setUserContextMenu(null); }}
+        onAssignRole={(u, roleId) => { serverData.assignRole(u.username, roleId); }}
+        onUnassignRole={(u, roleId) => { serverData.unassignRole(u.username, roleId); }}
+        serverRoles={serverData.serverRoles}
       />
 
       <MessageContextMenu
         contextMenu={chat.messageContextMenu}
         currentUser={authState.user}
+        myPermissions={serverData.selectedServer?.my_permissions}
         onDelete={chat.handleDeleteMessage}
         onEdit={(msg) => {
           chat.startEditing(msg);

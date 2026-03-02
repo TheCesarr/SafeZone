@@ -6,6 +6,7 @@ import EmojiPicker from 'emoji-picker-react';
 import { MessageContextMenu, UserContextMenu } from './ContextMenus';
 import MediaEmbed from './MediaEmbed';
 import ProfileCard from './ProfileCard';
+import { PERMISSIONS, hasPermission } from '../utils/permissions';
 
 const ChatArea = ({
     selectedChannel,
@@ -57,6 +58,9 @@ const ChatArea = ({
     const [selectedUserForProfile, setSelectedUserForProfile] = React.useState(null);
     const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
     const prevScrollHeight = useRef(0);
+
+    const canSendMessages = !selectedChannel || selectedDM || (myPermissions !== undefined ? hasPermission(myPermissions, PERMISSIONS.SEND_MESSAGES) : false);
+    const canAttachFiles = !selectedChannel || selectedDM || (myPermissions !== undefined ? hasPermission(myPermissions, PERMISSIONS.ATTACH_FILES) : false);
 
     // Close emoji picker on outside click
     React.useEffect(() => {
@@ -712,31 +716,34 @@ const ChatArea = ({
                         ))}
                     </div>
                 )}
-                <div className="chat-input-wrapper">
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
-                    <span
-                        onClick={() => { if (!isUploading) fileInputRef.current?.click() }}
-                        style={{
-                            cursor: 'pointer',
-                            marginRight: '10px',
-                            fontSize: '20px',
-                            color: isUploading ? '#faa61a' : (colors?.textMuted || 'rgba(255,255,255,0.3)'),
-                            transition: 'color 0.15s, transform 0.15s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '2px',
-                            borderRadius: '4px',
-                        }}
-                        onMouseEnter={e => { e.target.style.color = '#fff'; e.target.style.transform = 'scale(1.15)'; }}
-                        onMouseLeave={e => { e.target.style.color = isUploading ? '#faa61a' : (colors?.textMuted || 'rgba(255,255,255,0.3)'); e.target.style.transform = 'scale(1)'; }}
-                        title="Dosya Yükle"
-                    >
-                        {isUploading ? '⏳' : '＋'}
-                    </span>
+                <div className="chat-input-wrapper" style={{ opacity: canSendMessages ? 1 : 0.6 }}>
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} disabled={!canAttachFiles} />
+                    {canAttachFiles && (
+                        <span
+                            onClick={() => { if (!isUploading && canAttachFiles) fileInputRef.current?.click() }}
+                            style={{
+                                cursor: 'pointer',
+                                marginRight: '10px',
+                                fontSize: '20px',
+                                color: isUploading ? '#faa61a' : (colors?.textMuted || 'rgba(255,255,255,0.3)'),
+                                transition: 'color 0.15s, transform 0.15s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '2px',
+                                borderRadius: '4px',
+                            }}
+                            onMouseEnter={e => { e.target.style.color = '#fff'; e.target.style.transform = 'scale(1.15)'; }}
+                            onMouseLeave={e => { e.target.style.color = isUploading ? '#faa61a' : (colors?.textMuted || 'rgba(255,255,255,0.3)'); e.target.style.transform = 'scale(1)'; }}
+                            title="Dosya Yükle"
+                        >
+                            {isUploading ? '⏳' : '＋'}
+                        </span>
+                    )}
                     <input
                         className="chat-input"
                         type="text"
-                        placeholder={`Mesaj gönder: ${selectedDM ? '@' + selectedDM.username : (selectedChannel ? '#' + selectedChannel.name : '')}`}
+                        disabled={!canSendMessages}
+                        placeholder={canSendMessages ? `Mesaj gönder: ${selectedDM ? '@' + selectedDM.username : (selectedChannel ? '#' + selectedChannel.name : '')}` : `Mesaj gönderme yetkiniz yok`}
                         value={inputText}
                         onChange={(e) => {
                             let val = e.target.value;

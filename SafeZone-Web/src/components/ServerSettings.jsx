@@ -2,6 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { getUrl } from '../utils/api';
 import toast from '../utils/toast';
 
+const PERMISSIONS = [
+    { value: 1, label: "Kanalları Görüntüle", desc: "Kanalları ve o kanallardaki mesajları görebilme." },
+    { value: 2, label: "Kanalları Yönet", desc: "Yeni kanal oluşturma, kanalları düzenleme veya silme." },
+    { value: 4, label: "Rolleri Yönet", desc: "Yeni rol oluşturma, silme ve üyelere rol atama." },
+    { value: 8, label: "Sunucuyu Yönet", desc: "Sunucu ayarlarını açabilme, sunucu adını değiştirme." },
+    { value: 16, label: "Üyeleri At", desc: "Bir üyeyi sunucudan atabilme." },
+    { value: 32, label: "Üyeleri Yasakla", desc: "Bir üyeyi sunucudan uzaklaştırma (Ban)." },
+    { value: 64, label: "Mesaj Gönder", desc: "Metin kanallarına mesaj yazabilme." },
+    { value: 128, label: "Mesajları Yönet", desc: "Başkalarının mesajlarını silebilme." },
+    { value: 256, label: "Dosya Ekle", desc: "Sohbete fotoğraf, video veya dosya yükleyebilme." },
+    { value: 512, label: "@everyone Etiketleme", desc: "Herkese bildirim gönderebilme." },
+    { value: 1024, label: "Sese Bağlan", desc: "Ses kanallarına girebilme." },
+    { value: 2048, label: "Konuş", desc: "Ses kanallarında mikrofon açabilme ve ekran paylaşabilme." },
+    { value: 4096, label: "Üyeleri Sustur", desc: "Başka üyelerin mikrofonunu (Server-Mute) kapatabilme." },
+    { value: 8192, label: "Üyeleri Sağırlaştır", desc: "Başka üyelerin duymasını (Server-Deafen) engelleyebilme." },
+    { value: 16384, label: "Üyeleri Taşı", desc: "Üyeleri veya kendilerini farklı kanala taşıyabilme." },
+    { value: 32768, label: "Yönetici (Administrator)", desc: "Diğer tüm kısıtlamaları ezer. Bu yetkiye sahip rol her şeyi yapabilir.", color: "#ed4245" }
+];
+
 const ServerSettings = ({ server, onClose, authState, colors }) => {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roles'
     // Server Edit State
@@ -107,6 +126,16 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
             setSelectedRole(null);
             fetchRoles();
         } catch (e) { toast.error(e.message); }
+    };
+
+    const togglePermission = (permValue) => {
+        setEditPermissions(prev => {
+            if ((prev & permValue) === permValue) {
+                return prev & ~permValue;
+            } else {
+                return prev | permValue;
+            }
+        });
     };
 
     const bgColor = colors.background;
@@ -232,6 +261,39 @@ const ServerSettings = ({ server, onClose, authState, colors }) => {
                                                     <input value={editRoleColor} onChange={(e) => setEditRoleColor(e.target.value)} style={{ padding: '10px', backgroundColor: cardColor, border: `1px solid ${borderColor}`, color: textColor }} />
                                                 </div>
                                             </div>
+
+                                            {/* PERMISSIONS CHECKBOXES */}
+                                            <div style={{ marginBottom: '20px' }}>
+                                                <label style={{ display: 'block', color: mutedColor, fontSize: '12px', fontWeight: 'bold', marginBottom: '15px' }}>YETKİLER</label>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                                    {PERMISSIONS.map(perm => {
+                                                        const isChecked = (editPermissions & perm.value) === perm.value;
+                                                        return (
+                                                            <div key={perm.value} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '15px', borderBottom: `1px solid ${borderColor}` }}>
+                                                                <div>
+                                                                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: perm.color || textColor, marginBottom: '4px' }}>{perm.label}</div>
+                                                                    <div style={{ fontSize: '12px', color: mutedColor }}>{perm.desc}</div>
+                                                                </div>
+                                                                <div
+                                                                    onClick={() => togglePermission(perm.value)}
+                                                                    style={{
+                                                                        width: '40px', height: '20px', borderRadius: '10px',
+                                                                        backgroundColor: isChecked ? '#3ba55c' : '#72767d',
+                                                                        position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s'
+                                                                    }}
+                                                                >
+                                                                    <div style={{
+                                                                        width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff',
+                                                                        position: 'absolute', top: '2px', left: isChecked ? '22px' : '2px',
+                                                                        transition: 'left 0.2s'
+                                                                    }}></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
                                             <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '20px', display: 'flex', gap: '10px' }}>
                                                 <button onClick={handleSaveRole} style={{ padding: '10px 20px', backgroundColor: '#3ba55c', color: '#fff', border: 'none', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer' }}>Kaydet</button>
                                                 <button onClick={handleDeleteRole} style={{ padding: '10px 20px', backgroundColor: 'transparent', color: '#ed4245', border: '1px solid #ed4245', borderRadius: '3px', fontWeight: 'bold', cursor: 'pointer' }}>Sil</button>

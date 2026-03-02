@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getUrl } from '../utils/api';
+import { PERMISSIONS, hasPermission } from '../utils/permissions';
 
 const IconMic = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>;
 const IconMicOff = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>;
@@ -25,7 +26,8 @@ const UserFooter = ({
     onScreenShare,
     stopScreenShare,
     onStatusChange,
-    colors // Receive colors prop
+    colors,
+    myPermissions // Incoming server permissions
 }) => {
     const [showStatusMenu, setShowStatusMenu] = useState(false);
     const [customStatusInput, setCustomStatusInput] = useState(authState?.user?.custom_status || '');
@@ -84,6 +86,10 @@ const UserFooter = ({
     const textColor = colors?.text || '#fff';
     const mutedColor = colors?.textMuted || '#b9bbbe';
     const borderColor = colors?.border || 'rgba(255,255,255,0.1)';
+
+    // Permission Checks
+    const canSpeak = myPermissions !== undefined ? hasPermission(myPermissions, PERMISSIONS.SPEAK) : true;
+
 
     return (
         <div style={{ padding: '12px', backgroundColor: bgColor, borderTop: `1px solid ${borderColor}`, position: 'relative', transition: 'background-color 0.3s' }}>
@@ -206,20 +212,23 @@ const UserFooter = ({
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px' }}>
                     {/* Microphone */}
                     <button
-                        onClick={onToggleMute}
+                        onClick={() => {
+                            if (canSpeak) onToggleMute();
+                        }}
                         className="interactive-button"
-                        title={isMuted ? 'Mikrofonu Aç' : 'Mikrofonu Kapat'}
+                        title={!canSpeak ? 'Konuşma Yetkiniz Yok' : (isMuted ? 'Mikrofonu Aç' : 'Mikrofonu Kapat')}
                         style={{
                             background: 'transparent',
                             border: 'none',
-                            color: isMuted ? '#ed4245' : mutedColor,
+                            color: !canSpeak ? '#72767d' : (isMuted ? '#ed4245' : mutedColor),
                             padding: '8px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            position: 'relative'
+                            position: 'relative',
+                            cursor: canSpeak ? 'pointer' : 'not-allowed'
                         }}
                     >
-                        {isMuted && <div style={{ position: 'absolute', width: '100%', height: '2px', background: '#ed4245', transform: 'rotate(45deg)', opacity: 0.8 }}></div>}
-                        {isMuted ? <IconMicOff /> : <IconMic />}
+                        {(isMuted || !canSpeak) && <div style={{ position: 'absolute', width: '100%', height: '2px', background: '#ed4245', transform: 'rotate(45deg)', opacity: 0.8 }}></div>}
+                        {(isMuted || !canSpeak) ? <IconMicOff /> : <IconMic />}
                     </button>
 
                     {/* Headphones */}
@@ -264,22 +273,23 @@ const UserFooter = ({
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
+                            if (!canSpeak) return;
                             if (isScreenSharing) {
                                 stopScreenShare();
                             } else {
                                 onScreenShare();
                             }
                         }}
-                        disabled={!activeVoiceChannel}
+                        disabled={!activeVoiceChannel || !canSpeak}
                         className="interactive-button"
-                        title={isScreenSharing ? "Paylaşımı Durdur" : "Ekran Paylaş"}
+                        title={!canSpeak ? 'Yayın Yetkiniz Yok' : (isScreenSharing ? "Paylaşımı Durdur" : "Ekran Paylaş")}
                         style={{
                             background: 'transparent',
                             border: 'none',
-                            color: isScreenSharing ? '#ed4245' : (activeVoiceChannel ? mutedColor : (colors?.textMuted || '#4f545c')),
+                            color: !canSpeak ? '#72767d' : (isScreenSharing ? '#ed4245' : (activeVoiceChannel ? mutedColor : (colors?.textMuted || '#4f545c'))),
                             padding: '8px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: activeVoiceChannel ? 'pointer' : 'not-allowed',
+                            cursor: (activeVoiceChannel && canSpeak) ? 'pointer' : 'not-allowed',
                             position: 'relative'
                         }}
                     >

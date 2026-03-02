@@ -213,6 +213,60 @@ def check_permission(user_id: int, server_id: str, permission: int) -> bool:
         print(f"Permission check error: {e}")
         return False
 
+def get_user_permissions(user_id: int, server_id: str) -> int:
+    """
+    Returns the combined permission integer for a user in a server.
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        # 0. Check if user is SysAdmin
+        c.execute("SELECT is_sysadmin FROM users WHERE id = ?", (user_id,))
+        user_row = c.fetchone()
+        if user_row and user_row['is_sysadmin']:
+            conn.close()
+            return ALL_PERMISSIONS
+        
+        # 1. Check if user is server owner
+        c.execute("SELECT owner_id FROM servers WHERE id = ?", (server_id,))
+        server = c.fetchone()
+        if not server:
+            conn.close()
+            return 0
+        if server['owner_id'] == user_id:
+            conn.close()
+            return ALL_PERMISSIONS
+        
+        # 2. Check membership
+        c.execute("SELECT 1 FROM members WHERE server_id = ? AND user_id = ?", (server_id, user_id))
+        if not c.fetchone():
+            conn.close()
+            return 0
+        
+        # 3. Get role permissions
+        c.execute("""
+            SELECT r.permissions FROM roles r
+            JOIN user_roles ur ON r.id = ur.role_id
+            WHERE ur.server_id = ? AND ur.user_id = ?
+        """, (server_id, user_id))
+        
+        roles = c.fetchall()
+        conn.close()
+        
+        combined = DEFAULT_PERMISSIONS
+        for role in roles:
+            combined |= role['permissions']
+        
+        if combined & PERM_ADMINISTRATOR:
+            return ALL_PERMISSIONS
+            
+        return combined
+        
+    except Exception as e:
+        print(f"Permission fetch error: {e}")
+        return 0
+
 def get_user_by_token(token: str):
     """Helper to validate token and return user row."""
     conn = get_db_connection()

@@ -171,6 +171,78 @@ export const useServerData = (authState) => {
         } catch (e) { console.error(e); }
     };
 
+    const kickMember = async (targetUsername) => {
+        if (!selectedServer || !window.confirm(`"${targetUsername}" kullanıcısını atmak istediğine emin misin?`)) return;
+        try {
+            const member = serverMembers.find(m => m.username === targetUsername);
+            if (!member) return;
+            const res = await fetch(getUrl(`/server/${selectedServer.id}/kick`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, target_user_id: member.id })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.success('Kullanıcı atıldı');
+                await fetchServerMembers(selectedServer.id);
+            } else toast.error(data.message);
+        } catch (e) { toast.error(e.message); }
+    };
+
+    const banMember = async (targetUsername) => {
+        if (!selectedServer || !window.confirm(`"${targetUsername}" kullanıcısını yasaklamak istediğine emin misin?`)) return;
+        try {
+            const member = serverMembers.find(m => m.username === targetUsername);
+            if (!member) return;
+            const res = await fetch(getUrl(`/server/${selectedServer.id}/ban`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, target_user_id: member.id, reason: "Admin Action" })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.success('Kullanıcı yasaklandı');
+                await fetchServerMembers(selectedServer.id);
+            } else toast.error(data.message);
+        } catch (e) { toast.error(e.message); }
+    };
+
+    const assignRole = async (targetUsername, roleId) => {
+        if (!selectedServer) return;
+        try {
+            const member = serverMembers.find(m => m.username === targetUsername);
+            if (!member) return;
+            const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${roleId}/assign`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, user_id: member.id })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.success('Rol atandı');
+                await fetchServerMembers(selectedServer.id);
+            } else toast.error(data.message);
+        } catch (e) { toast.error(e.message); }
+    };
+
+    const unassignRole = async (targetUsername, roleId) => {
+        if (!selectedServer) return;
+        try {
+            const member = serverMembers.find(m => m.username === targetUsername);
+            if (!member) return;
+            const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${roleId}/unassign`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, user_id: member.id })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.success('Rol alındı');
+                await fetchServerMembers(selectedServer.id);
+            } else toast.error(data.message);
+        } catch (e) { toast.error(e.message); }
+    };
+
     const handleCreateChannel = async (server_id, channelName, type) => {
         try {
             const res = await fetch(getUrl('/channel/create'), {
@@ -323,6 +395,10 @@ export const useServerData = (authState) => {
         addFriend,
         removeFriend,
         respondFriendRequest,
-        blockUser
+        blockUser,
+        kickMember,
+        banMember,
+        assignRole,
+        unassignRole
     };
 }

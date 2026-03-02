@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form
 from models import ServerCreate, ServerJoin, RoleCreate
 from database import get_db_connection
-from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_ROLES, PERM_KICK_MEMBERS, PERM_BAN_MEMBERS, PERM_MANAGE_CHANNELS, PERM_MANAGE_SERVER, check_server_membership, validate_upload, ALLOWED_IMAGE_EXTS
+from utils import log_event, check_permission, get_user_permissions, create_audit_log, PERM_MANAGE_ROLES, PERM_KICK_MEMBERS, PERM_BAN_MEMBERS, PERM_MANAGE_CHANNELS, PERM_MANAGE_SERVER, check_server_membership, validate_upload, ALLOWED_IMAGE_EXTS
 import uuid
 import secrets
 import sqlite3
@@ -72,10 +72,13 @@ async def list_user_servers(token: str):
         
         servers = [dict(row) for row in c.fetchall()]
         
-        # For each server, get channels (Simple approach for now)
+        # For each server, get channels
         for s in servers:
             c.execute("SELECT id, name, type FROM channels WHERE server_id = ?", (s['id'],))
             s['channels'] = [dict(row) for row in c.fetchall()]
+            
+            # Calculate and attach the user's permissions for this server
+            s['my_permissions'] = get_user_permissions(user['id'], s['id'])
             
         conn.close()
         return {"status": "success", "servers": servers}

@@ -1,5 +1,7 @@
 import React from 'react';
 import UserFooter from './UserFooter';
+import { PERMISSIONS, hasPermission } from '../utils/permissions';
+import toast from '../utils/toast';
 
 
 const ChannelList = ({
@@ -153,28 +155,45 @@ const ChannelList = ({
                             <div style={{ fontSize: '10px', color: colors?.textMuted || '#666', marginTop: '4px' }}>CODE: {selectedServer.invite_code}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '5px' }}>
-                            <button
-                                onClick={handleServerSettings}
-                                title="Sunucu Ayarları (Roller)"
-                                style={{ background: 'none', border: 'none', color: colors?.textMuted || '#b9bbbe', fontSize: '16px', cursor: 'pointer', padding: '5px' }}
-                            >
-                                ⚙️
-                            </button>
-                            <button
-                                onClick={() => setShowChannelCreateModal(true)}
-                                title="Kanal Ekle"
-                                style={{ background: 'none', border: 'none', color: '#34C759', fontSize: '20px', cursor: 'pointer', padding: '5px' }}
-                            >
-                                +
-                            </button>
+                            {hasPermission(selectedServer.my_permissions, PERMISSIONS.MANAGE_SERVER) && (
+                                <button
+                                    onClick={handleServerSettings}
+                                    title="Sunucu Ayarları (Roller)"
+                                    style={{ background: 'none', border: 'none', color: colors?.textMuted || '#b9bbbe', fontSize: '16px', cursor: 'pointer', padding: '5px' }}
+                                >
+                                    ⚙️
+                                </button>
+                            )}
+                            {hasPermission(selectedServer.my_permissions, PERMISSIONS.MANAGE_CHANNELS) && (
+                                <button
+                                    onClick={() => setShowChannelCreateModal(true)}
+                                    title="Kanal Ekle"
+                                    style={{ background: 'none', border: 'none', color: '#34C759', fontSize: '20px', cursor: 'pointer', padding: '5px' }}
+                                >
+                                    +
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     <div style={{ flexGrow: 1, padding: '10px', overflowY: 'auto' }}>
-                        {selectedServer.channels?.map(ch => (
+                        {selectedServer.channels?.filter(ch => {
+                            if (selectedServer.my_permissions === undefined) return true;
+                            return hasPermission(selectedServer.my_permissions, PERMISSIONS.VIEW_CHANNELS);
+                        }).map(ch => (
                             <div key={ch.id}>
                                 <div
-                                    onClick={() => handleChannelClick(ch)}
+                                    onClick={() => {
+                                        if (ch.type === 'voice') {
+                                            const canConnect = selectedServer.my_permissions !== undefined ? hasPermission(selectedServer.my_permissions, PERMISSIONS.CONNECT) : true;
+                                            if (!canConnect) {
+                                                // toast might be from react-hot-toast or react-toastify, use generic alert fallback if not handled
+                                                alert("Ses odasına bağlanma yetkiniz yok.");
+                                                return;
+                                            }
+                                        }
+                                        handleChannelClick(ch);
+                                    }}
                                     onContextMenu={(e) => {
                                         e.preventDefault();
                                         setContextMenu({ x: e.clientX, y: e.clientY, channelId: ch.id, channel: ch });
@@ -270,6 +289,7 @@ const ChannelList = ({
             }
 
             <UserFooter
+                myPermissions={selectedServer?.my_permissions}
                 authState={authState}
                 activeVoiceChannel={activeVoiceChannel}
                 selectedServer={selectedServer}

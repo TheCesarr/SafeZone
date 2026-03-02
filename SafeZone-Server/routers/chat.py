@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query
 from database import get_db_connection, DB_NAME
-from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES, check_channel_membership, check_server_membership, validate_upload, ALLOWED_CHAT_EXTS, safe_error
+from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES, PERM_VIEW_CHANNELS, PERM_SEND_MESSAGES, PERM_ATTACH_FILES, check_channel_membership, check_server_membership, validate_upload, ALLOWED_CHAT_EXTS, safe_error
 from state import lobby, rooms, VoiceRoom, broadcast_room_update, broadcast_user_list
 import sqlite3
 import json
@@ -35,12 +35,14 @@ async def get_voice_log(channel_id: str, token: str, limit: int = 50):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
         conn.close()
-        # 2. Authorization: must be a member of this channel's server
-        if not check_channel_membership(user['id'], channel_id):
-            return {"status": "error", "message": "Erişim reddedildi."}
+        # 2. Authorization: must have VIEW_CHANNELS permission in that server
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        channel = c.fetchone()
+        if not channel or not check_permission(user['id'], channel['server_id'], PERM_VIEW_CHANNELS):
+            conn.close()
+            return {"status": "error", "message": "Odayı görüntüleme yetkiniz yok."}
+        
         # 3. Fetch logs
-        conn = get_db_connection()
-        c = conn.cursor()
         c.execute(
             "SELECT user_id, action, timestamp FROM voice_logs WHERE channel_id = ? ORDER BY timestamp DESC LIMIT ?",
             (channel_id, min(limit, 200))
@@ -64,11 +66,13 @@ async def get_channel_messages(channel_id: str, token: str, before: int = None, 
             conn.close()
             return {"status": "error", "message": "Invalid token"}
         conn.close()
-        # 2. Authorization: must be member of this channel's server
-        if not check_channel_membership(user['id'], channel_id):
-            return {"status": "error", "message": "Erişim reddedildi."}
-        conn = get_db_connection()
-        c = conn.cursor()
+        # 2. Authorization: must have VIEW_CHANNELS permission in that server
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        channel = c.fetchone()
+        if not channel or not check_permission(user['id'], channel['server_id'], PERM_VIEW_CHANNELS):
+            conn.close()
+            return {"status": "error", "message": "Odayı görüntüleme yetkiniz yok."}
+        
         # 3. Get Messages (with pagination)
         if before:
             c.execute('''
@@ -468,11 +472,13 @@ async def get_pinned_messages(channel_id: str, token: str):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
         conn.close()
-        # Authorization: must be member of this channel's server
-        if not check_channel_membership(user['id'], channel_id):
-            return {"status": "error", "message": "Erişim reddedildi."}
-        conn = get_db_connection()
-        c = conn.cursor()
+        # Authorization: must have VIEW_CHANNELS permission in that server
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        channel = c.fetchone()
+        if not channel or not check_permission(user['id'], channel['server_id'], PERM_VIEW_CHANNELS):
+            conn.close()
+            return {"status": "error", "message": "Odayı görüntüleme yetkiniz yok."}
+        
         c.execute('''
             SELECT cm.id, cm.content, cm.timestamp, u.username as sender
             FROM channel_messages cm
@@ -501,11 +507,13 @@ async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
             conn.close()
             return {"status": "error", "message": "Invalid token"}
         conn.close()
-        # Authorization: must be member of this channel's server
-        if not check_channel_membership(user['id'], channel_id):
-            return {"status": "error", "message": "Erişim reddedildi."}
-        conn = get_db_connection()
-        c = conn.cursor()
+        # Authorization: must have VIEW_CHANNELS permission in that server
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        channel = c.fetchone()
+        if not channel or not check_permission(user['id'], channel['server_id'], PERM_VIEW_CHANNELS):
+            conn.close()
+            return {"status": "error", "message": "Odayı görüntüleme yetkiniz yok."}
+        
         if not q or len(q) < 2:
             conn.close()
             return {"status": "error", "message": "Arama en az 2 karakter olmalı"}
@@ -789,6 +797,17 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
                 c.execute("SELECT id, username FROM users WHERE username = ?", (data.get('sender', user_id),))
                 user_row = c.fetchone()
                 if user_row:
+                    c.execute("SELECT server_id FROM channels WHERE id = ?", (room_id,))
+                    chan = c.fetchone()
+                    if chan and not check_permission(user_row['id'], chan['server_id'], PERM_SEND_MESSAGES):
+                        conn.close()
+                        continue
+                    
+                    if data.get('attachment_url'):
+                        if chan and not check_permission(user_row['id'], chan['server_id'], PERM_ATTACH_FILES):
+                            conn.close()
+                            continue
+                        
                     c.execute('''INSERT INTO channel_messages 
                                 (channel_id, sender_id, content, attachment_url, attachment_type, attachment_name, reply_to_id) 
                                 VALUES (?, ?, ?, ?, ?, ?, ?)''', 
