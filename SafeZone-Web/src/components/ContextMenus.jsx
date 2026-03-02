@@ -90,17 +90,16 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, o
             <div style={{ height: '1px', background: '#333', margin: '5px 0' }}></div>
 
             {canManageRoles && serverRoles && serverRoles.length > 0 && (
-                <div
-                    onMouseEnter={() => setShowRoleSubmenu(true)}
-                    onMouseLeave={() => setShowRoleSubmenu(false)}
-                    style={{ position: 'relative', padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', ':hover': { background: '#40444b' } }}
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Rol Ata</span>
-                        <span style={{ fontSize: '10px' }}>▶</span>
+                <div style={{ position: 'relative' }}>
+                    <div
+                        onClick={() => setShowRoleSubmenu(prev => !prev)}
+                        style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: showRoleSubmenu ? '#2f2f2f' : 'transparent' }}
+                    >
+                        <span>🏷️ Rol Ata</span>
+                        <span style={{ fontSize: '10px' }}>{showRoleSubmenu ? '▼' : '▶'}</span>
                     </div>
                     {showRoleSubmenu && (
-                        <div style={{ position: 'absolute', top: '-5px', left: '100%', background: '#111', border: '1px solid #333', borderRadius: '4px', padding: '5px', minWidth: '150px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', zIndex: 20001, marginLeft: '2px' }}>
+                        <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px', margin: '2px 8px', overflow: 'hidden' }}>
                             {serverRoles.map(role => {
                                 const isAssigned = hasRole(role.id);
                                 return (
@@ -111,9 +110,11 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, o
                                             if (isAssigned) onUnassignRole(contextMenu.user, role.id);
                                             else onAssignRole(contextMenu.user, role.id);
                                         }}
-                                        style={{ padding: '6px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '2px', ':hover': { background: '#40444b' } }}
+                                        style={{ padding: '6px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '2px' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#2f2f2f'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                     >
-                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: role.color }}></div>
+                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: role.color, flexShrink: 0 }}></div>
                                         <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{role.name}</span>
                                         {isAssigned && <span style={{ color: '#3ba55c', fontWeight: 'bold' }}>✓</span>}
                                     </div>

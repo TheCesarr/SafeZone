@@ -184,7 +184,7 @@ export const useServerData = (authState) => {
             const data = await res.json();
             if (data.status === 'success') {
                 toast.success('Kullanıcı atıldı');
-                await fetchServerMembers(selectedServer.id);
+                await fetchMembers(selectedServer.id);
             } else toast.error(data.message);
         } catch (e) { toast.error(e.message); }
     };
@@ -202,7 +202,7 @@ export const useServerData = (authState) => {
             const data = await res.json();
             if (data.status === 'success') {
                 toast.success('Kullanıcı yasaklandı');
-                await fetchServerMembers(selectedServer.id);
+                await fetchMembers(selectedServer.id);
             } else toast.error(data.message);
         } catch (e) { toast.error(e.message); }
     };
@@ -220,7 +220,7 @@ export const useServerData = (authState) => {
             const data = await res.json();
             if (data.status === 'success') {
                 toast.success('Rol atandı');
-                await fetchServerMembers(selectedServer.id);
+                await fetchMembers(selectedServer.id);
             } else toast.error(data.message);
         } catch (e) { toast.error(e.message); }
     };
@@ -238,7 +238,7 @@ export const useServerData = (authState) => {
             const data = await res.json();
             if (data.status === 'success') {
                 toast.success('Rol alındı');
-                await fetchServerMembers(selectedServer.id);
+                await fetchMembers(selectedServer.id);
             } else toast.error(data.message);
         } catch (e) { toast.error(e.message); }
     };

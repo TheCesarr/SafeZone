@@ -5,14 +5,27 @@ import ProfileCard from './ProfileCard';
 const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu, serverRoles = [], currentUser, selectedServer, authToken }) => {
     const [selectedUserForProfile, setSelectedUserForProfile] = useState(null);
 
-    // Group members: Online by highest_role, Offline
+    // Group members: Admin first, Owner second, then Online by highest_role, Offline
     const groupedMembers = useMemo(() => {
+        const adminGroup = { name: 'ADMİN', color: '#000000', isAdmin: true, members: [] };
+        const ownerGroup = { name: 'Sahip', color: '#f0a500', position: 9999, members: [] };
         const groups = {};
         const offline = [];
 
         members.forEach(member => {
             const isOnline = onlineUserIds.includes(member.username);
+
+            // Sysadmin always goes to ADMIN group, always online
+            if (member.is_sysadmin) {
+                adminGroup.members.push(member);
+                return;
+            }
+
             if (isOnline) {
+                if (member.legacy_role === 'owner') {
+                    ownerGroup.members.push(member);
+                    return;
+                }
                 const roleName = member.highest_role?.name || 'Çevrim İçi';
                 if (!groups[roleName]) {
                     groups[roleName] = {
@@ -28,11 +41,16 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
             }
         });
 
-        const onlineGroups = Object.values(groups).sort((a, b) => {
+        const onlineGroups = [];
+        if (adminGroup.members.length > 0) onlineGroups.push(adminGroup);
+        if (ownerGroup.members.length > 0) onlineGroups.push(ownerGroup);
+
+        const roleGroups = Object.values(groups).sort((a, b) => {
             if (a.name === 'Çevrim İçi') return 1;
             if (b.name === 'Çevrim İçi') return -1;
             return b.position - a.position;
         });
+        onlineGroups.push(...roleGroups);
 
         onlineGroups.forEach(g => g.members.sort((a, b) => a.username.localeCompare(b.username)));
         offline.sort((a, b) => a.username.localeCompare(b.username));
@@ -80,15 +98,32 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                 {/* ONLINE SECTIONS BY ROLE */}
                 {groupedMembers.onlineGroups.map(group => (
                     <div key={group.name} style={{ marginBottom: '24px' }}>
-                        <div style={{
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            color: colors.textMuted,
-                            marginBottom: '8px',
-                            textTransform: 'uppercase'
-                        }}>
-                            {group.name} — {group.members.length}
-                        </div>
+                        {group.isAdmin ? (
+                            <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                backgroundColor: '#111',
+                                border: '1px solid #333',
+                                borderRadius: '4px',
+                                padding: '2px 8px',
+                                marginBottom: '8px',
+                                gap: '6px'
+                            }}>
+                                <span style={{ fontSize: '10px', color: '#ff4444', fontWeight: 900 }}>&#9670;</span>
+                                <span style={{ fontSize: '11px', fontWeight: 900, color: '#ff4444', letterSpacing: '2px' }}>ADMİN</span>
+                                <span style={{ fontSize: '11px', color: '#666' }}>— {group.members.length}</span>
+                            </div>
+                        ) : (
+                            <div style={{
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                color: group.color || colors.textMuted,
+                                marginBottom: '8px',
+                                textTransform: 'uppercase'
+                            }}>
+                                {group.name} — {group.members.length}
+                            </div>
+                        )}
                         {group.members.map(member => (
                             <div key={member.id} style={{
                                 display: 'flex',
