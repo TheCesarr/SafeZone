@@ -176,10 +176,11 @@ export const useServerData = (authState) => {
         try {
             const member = serverMembers.find(m => m.username === targetUsername);
             if (!member) return;
+            const memberId = member.user_id || member.id;
             const res = await fetch(getUrl(`/server/${selectedServer.id}/kick`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authState.token, target_user_id: member.id })
+                body: JSON.stringify({ token: authState.token, target_user_id: memberId })
             });
             const data = await res.json();
             if (data.status === 'success') {
@@ -194,10 +195,11 @@ export const useServerData = (authState) => {
         try {
             const member = serverMembers.find(m => m.username === targetUsername);
             if (!member) return;
+            const memberId = member.user_id || member.id;
             const res = await fetch(getUrl(`/server/${selectedServer.id}/ban`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authState.token, target_user_id: member.id, reason: "Admin Action" })
+                body: JSON.stringify({ token: authState.token, target_user_id: memberId, reason: "Admin Action" })
             });
             const data = await res.json();
             if (data.status === 'success') {
@@ -210,8 +212,14 @@ export const useServerData = (authState) => {
     const assignRole = async (targetUser, roleId) => {
         if (!selectedServer) return;
         try {
-            // Accept either a user object or a username string (backwards compat)
-            const userId = typeof targetUser === 'object' ? targetUser.id : serverMembers.find(m => m.username === targetUser)?.id;
+            // targetUser can be a full member object or a username string
+            let userId;
+            if (typeof targetUser === 'object') {
+                userId = targetUser.user_id || targetUser.id;
+            } else {
+                const m = serverMembers.find(m => m.username === targetUser);
+                userId = m ? (m.user_id || m.id) : null;
+            }
             if (!userId) { toast.error('Kullanıcı bulunamadı'); return; }
             const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${roleId}/assign`), {
                 method: 'POST',
@@ -229,7 +237,13 @@ export const useServerData = (authState) => {
     const unassignRole = async (targetUser, roleId) => {
         if (!selectedServer) return;
         try {
-            const userId = typeof targetUser === 'object' ? targetUser.id : serverMembers.find(m => m.username === targetUser)?.id;
+            let userId;
+            if (typeof targetUser === 'object') {
+                userId = targetUser.user_id || targetUser.id;
+            } else {
+                const m = serverMembers.find(m => m.username === targetUser);
+                userId = m ? (m.user_id || m.id) : null;
+            }
             if (!userId) { toast.error('Kullanıcı bulunamadı'); return; }
             const res = await fetch(getUrl(`/server/${selectedServer.id}/roles/${roleId}/unassign`), {
                 method: 'POST',
