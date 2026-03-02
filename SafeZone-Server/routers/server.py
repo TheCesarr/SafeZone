@@ -466,11 +466,9 @@ async def update_role(server_id: str, role_id: int, data: dict):
         return safe_error(e)
 
 @router.delete("/{server_id}/roles/{role_id}")
-async def delete_role(server_id: str, role_id: int, data: dict):
+async def delete_role(server_id: str, role_id: int, token: str):
     """Delete a role from the server."""
     try:
-        token = data.get('token')
-        
         conn = get_db_connection()
         c = conn.cursor()
         
