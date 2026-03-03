@@ -45,6 +45,9 @@ export const ChannelContextMenu = ({ contextMenu, onDelete, onEdit, myPermission
 
 export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, onMute, onVolumeChange, volume = 1, isMuted = false, myPermissions, onKick, onBan, onAssignRole, onUnassignRole, serverRoles }) => {
     const [showRoleSubmenu, setShowRoleSubmenu] = useState(false);
+    const [submenuFlip, setSubmenuFlip] = useState(false); // true = open left
+    const submenuRef = React.useRef(null);
+    const triggerRef = React.useRef(null);
     const hideTimer = React.useRef(null);
 
     const openSubmenu = () => { clearTimeout(hideTimer.current); setShowRoleSubmenu(true); };
@@ -115,13 +118,26 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, o
 
                     {showRoleSubmenu && (
                         <div
+                            ref={el => {
+                                // Measure once on mount and flip if overflows right
+                                if (el) {
+                                    const rect = el.getBoundingClientRect();
+                                    if (rect.right > window.innerWidth - 8 && !submenuFlip) {
+                                        setSubmenuFlip(true);
+                                    } else if (rect.left < 8 && submenuFlip) {
+                                        setSubmenuFlip(false);
+                                    }
+                                }
+                            }}
                             onMouseEnter={openSubmenu}
                             onMouseLeave={closeSubmenu}
                             style={{
                                 position: 'absolute',
                                 top: 0,
-                                left: '100%',
-                                marginLeft: '2px',
+                                ...(submenuFlip
+                                    ? { right: '100%', marginRight: '2px' }
+                                    : { left: '100%', marginLeft: '2px' }
+                                ),
                                 background: '#111',
                                 border: '1px solid #333',
                                 borderRadius: '4px',
