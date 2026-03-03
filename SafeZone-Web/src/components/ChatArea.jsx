@@ -169,24 +169,21 @@ const ChatArea = ({
     const handlePin = React.useCallback(async (msg) => {
         if (!authToken || !selectedChannel) return;
         const isPinned = msg.is_pinned;
-        const endpoint = isPinned ? `/message/${msg.id}/unpin` : `/message/${msg.id}/pin`;
+        const endpoint = isPinned
+            ? `/message/${msg.id}/unpin?token=${authToken}`
+            : `/message/${msg.id}/pin?token=${authToken}&channel_id=${selectedChannel.id}`;
         try {
-            const res = await fetch(getUrl(endpoint), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authToken, channel_id: selectedChannel.id })
-            });
+            const res = await fetch(getUrl(endpoint), { method: 'POST' });
             const data = await res.json();
             if (data.status === 'success') {
-                // Optimistic update in messages list
                 setMessages && setMessages(prev => prev.map(m =>
                     m.id === msg.id ? { ...m, is_pinned: !isPinned } : m
                 ));
-                // Refresh pin panel if open
                 if (showPins) fetchPins();
             }
         } catch (e) { console.error(e); }
     }, [authToken, selectedChannel, setMessages, showPins]);
+
 
     const fetchPins = React.useCallback(async () => {
         if (!selectedChannel || !authToken) return;

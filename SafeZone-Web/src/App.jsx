@@ -876,18 +876,20 @@ function App() {
         }}
         onPin={async (msg) => {
           const isPinned = msg.is_pinned;
-          const endpoint = isPinned ? `/message/${msg.id}/unpin` : `/message/${msg.id}/pin`;
+          const channelId = serverData.selectedChannel?.id;
+          const token = authState.user?.token;
+          const endpoint = isPinned
+            ? `/message/${msg.id}/unpin?token=${token}`
+            : `/message/${msg.id}/pin?token=${token}&channel_id=${channelId}`;
           try {
             const { getUrl } = await import('./utils/api');
-            await fetch(getUrl(endpoint), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: authState.user?.token, channel_id: serverData.selectedChannel?.id })
-            });
-            // Update message in chat hook state
-            chat.setMessages && chat.setMessages(prev => prev.map(m =>
-              m.id === msg.id ? { ...m, is_pinned: !isPinned } : m
-            ));
+            const res = await fetch(getUrl(endpoint), { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') {
+              chat.setMessages && chat.setMessages(prev => prev.map(m =>
+                m.id === msg.id ? { ...m, is_pinned: !isPinned } : m
+              ));
+            }
           } catch (e) { console.error(e); }
           setTimeout(() => chat.setMessageContextMenu(null), 0);
         }}
