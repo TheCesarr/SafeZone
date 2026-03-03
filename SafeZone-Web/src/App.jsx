@@ -874,7 +874,25 @@ function App() {
           chat.setEmojiPickerPosition({ x: context.x, y: context.y });
           setTimeout(() => chat.setMessageContextMenu(null), 0);
         }}
+        onPin={async (msg) => {
+          const isPinned = msg.is_pinned;
+          const endpoint = isPinned ? `/message/${msg.id}/unpin` : `/message/${msg.id}/pin`;
+          try {
+            const { getUrl } = await import('./utils/api');
+            await fetch(getUrl(endpoint), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: authState.user?.token, channel_id: serverData.selectedChannel?.id })
+            });
+            // Update message in chat hook state
+            chat.setMessages && chat.setMessages(prev => prev.map(m =>
+              m.id === msg.id ? { ...m, is_pinned: !isPinned } : m
+            ));
+          } catch (e) { console.error(e); }
+          setTimeout(() => chat.setMessageContextMenu(null), 0);
+        }}
       />
+
 
       {/* Persistent Screen Share Overlay */}
       {

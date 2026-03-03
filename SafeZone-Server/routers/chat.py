@@ -155,6 +155,171 @@ async def get_channel_messages(channel_id: str, token: str, before: int = None, 
     except Exception as e:
         return safe_error(e)
 
+# --- SEARCH ---
+@router.get("/channel/{channel_id}/messages/search")
+async def search_channel_messages(channel_id: str, token: str, q: str, limit: int = 30):
+    try:
+        if not q or len(q.strip()) < 2:
+            return {"status": "error", "message": "Arama terimi en az 2 karakter olmalı"}
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        channel = c.fetchone()
+        if not channel or not check_permission(user['id'], channel['server_id'], PERM_VIEW_CHANNELS):
+            conn.close()
+            return {"status": "error", "message": "Erişim reddedildi"}
+        c.execute('''
+            SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type,
+                   cm.attachment_name, cm.edited_at, cm.reply_to_id, cm.is_pinned, u.username as sender
+            FROM channel_messages cm
+            JOIN users u ON cm.sender_id = u.id
+            WHERE cm.channel_id = ? AND cm.content LIKE ?
+            ORDER BY cm.timestamp DESC
+            LIMIT ?
+        ''', (channel_id, f'%{q.strip()}%', min(limit, 50)))
+        rows = c.fetchall()
+        conn.close()
+        results = [{
+            "id": r['id'], "sender": r['sender'], "text": r['content'],
+            "timestamp": r['timestamp'], "is_pinned": bool(r['is_pinned']),
+            "attachment_url": r['attachment_url'], "attachment_type": r['attachment_type']
+        } for r in rows]
+        return {"status": "success", "results": results, "query": q}
+    except Exception as e:
+        return safe_error(e)
+
+# --- PIN / UNPIN ---
+@router.post("/message/{message_id}/pin")
+async def pin_message(message_id: int, token: str, channel_id: str):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("SELECT channel_id FROM channel_messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg:
+            conn.close()
+            return {"status": "error", "message": "Mesaj bulunamadı"}
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (msg['channel_id'],))
+        ch = c.fetchone()
+        if not ch or not check_permission(user['id'], ch['server_id'], PERM_MANAGE_MESSAGES):
+            conn.close()
+            return {"status": "error", "message": "Yetkiniz yok"}
+        c.execute("UPDATE channel_messages SET is_pinned = 1 WHERE id = ?", (message_id,))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return safe_error(e)
+
+@router.post("/message/{message_id}/unpin")
+async def unpin_message(message_id: int, token: str):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("SELECT channel_id FROM channel_messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg:
+            conn.close()
+            return {"status": "error", "message": "Mesaj bulunamadı"}
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (msg['channel_id'],))
+        ch = c.fetchone()
+        if not ch or not check_permission(user['id'], ch['server_id'], PERM_MANAGE_MESSAGES):
+            conn.close()
+            return {"status": "error", "message": "Yetkiniz yok"}
+        c.execute("UPDATE channel_messages SET is_pinned = 0 WHERE id = ?", (message_id,))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return safe_error(e)
+
+@router.get("/channel/{channel_id}/pins")
+async def get_pinned_messages(channel_id: str, token: str):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
+        ch = c.fetchone()
+        if not ch or not check_permission(user['id'], ch['server_id'], PERM_VIEW_CHANNELS):
+            conn.close()
+            return {"status": "error", "message": "Erişim reddedildi"}
+        c.execute('''
+            SELECT cm.id, cm.content, cm.timestamp, cm.attachment_url, cm.attachment_type, u.username as sender
+            FROM channel_messages cm JOIN users u ON cm.sender_id = u.id
+            WHERE cm.channel_id = ? AND cm.is_pinned = 1
+            ORDER BY cm.timestamp DESC
+        ''', (channel_id,))
+        rows = c.fetchall()
+        conn.close()
+        return {"status": "success", "pins": [dict(r) for r in rows]}
+    except Exception as e:
+        return safe_error(e)
+
+# --- REACTIONS ---
+@router.post("/message/{message_id}/react")
+async def add_reaction(message_id: int, token: str, emoji: str):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        try:
+            c.execute("INSERT INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)",
+                     (message_id, user['id'], emoji))
+            conn.commit()
+        except Exception:
+            pass  # Already reacted (UNIQUE constraint)
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return safe_error(e)
+
+@router.delete("/message/{message_id}/react")
+async def remove_reaction(message_id: int, token: str, emoji: str):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?",
+                 (message_id, user['id'], emoji))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return safe_error(e)
+
+@router.get("/channel/{channel_id}/messages")
+async def get_channel_messages_redirect(channel_id: str, token: str, before: int = None, limit: int = 100):
+    """Alias — same as above"""
+    pass  # Already defined above
+
 @router.post("/chat/upload")
 async def chat_upload(token: str = Form(...), file: UploadFile = File(...)):
     try:
