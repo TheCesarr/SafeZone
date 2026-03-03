@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useLayoutEffect, useCallback } from 'react';
 import { getUrl } from '../utils/api';
 
-const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect, currentUser, selectedServer, authToken }) => {
+const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect, currentUser, selectedServer, authToken, onRoleToggled }) => {
     const cardRef = useRef(null);
     const [position, setPosition] = useState({ opacity: 0 }); // Hidden until measured
 
@@ -38,6 +38,7 @@ const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect, currentUse
                 setAssignedRoleIds(prev =>
                     hasRole ? prev.filter(id => id !== role.id) : [...prev, role.id]
                 );
+                onRoleToggled && onRoleToggled(); // 🔄 Notify parent to re-fetch members
             }
         } catch (e) { console.error('Role toggle error:', e); }
         finally { setRoleLoading(null); }
@@ -54,7 +55,7 @@ const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect, currentUse
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [onClose]);
 
-    // Smart positioning: runs after every render so re-measures if content changes (e.g. role added)
+    // Smart positioning: re-runs when rect changes OR when role list changes (card may grow/shrink)
     useLayoutEffect(() => {
         if (!cardRef.current) return;
 
@@ -88,7 +89,7 @@ const ProfileCard = ({ user, onClose, colors, serverRoles = [], rect, currentUse
         if (topPx < MARGIN) topPx = MARGIN;
 
         setPosition({ left: `${leftPx}px`, top: `${topPx}px`, opacity: 1, transform: 'none' });
-    }); // intentionally no dep array — runs after every render to adapt to content size changes
+    }, [rect, assignedRoleIds.length]); // re-run when position anchor or role count changes
 
     if (!user) return null;
 

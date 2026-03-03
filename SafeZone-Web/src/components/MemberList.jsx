@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { getUrl } from '../utils/api';
 import ProfileCard from './ProfileCard';
 
-const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu, serverRoles = [], currentUser, selectedServer, authToken }) => {
+const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onResizeStart, handleUserContextMenu, serverRoles = [], currentUser, selectedServer, authToken, onRoleToggled }) => {
     const [selectedUserForProfile, setSelectedUserForProfile] = useState(null);
 
     // Group members: Admin first, Owner second, then Online by highest_role, Offline
@@ -263,6 +263,7 @@ const MemberList = ({ members, onlineUserIds, userStatuses, colors, width, onRes
                     currentUser={currentUser}
                     selectedServer={selectedServer}
                     authToken={authToken}
+                    onRoleToggled={onRoleToggled}
                     onClose={() => setSelectedUserForProfile(null)}
                 />
             )}

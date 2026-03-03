@@ -626,6 +626,7 @@ function App() {
                 setMessages={chat.setMessages}
                 serverRoles={serverData.serverRoles || []}
                 selectedServer={serverData.selectedServer}
+                onRoleToggled={() => serverData.fetchMembers(serverData.selectedServer?.id)}
               />
 
               {/* Member List - Only show in server text channels (not DMs for now, unless requested) */}
@@ -642,6 +643,7 @@ function App() {
                   currentUser={authState.user}
                   selectedServer={serverData.selectedServer}
                   authToken={authState.token}
+                  onRoleToggled={() => serverData.fetchMembers(serverData.selectedServer?.id)}
                 />
               )}
             </>

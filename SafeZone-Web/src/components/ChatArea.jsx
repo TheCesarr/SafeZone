@@ -46,7 +46,8 @@ const ChatArea = ({
     setMessages,
     serverRoles = [],
     selectedServer = null,
-    myPermissions = undefined
+    myPermissions = undefined,
+    onRoleToggled = null
 }) => {
     const currentMessages = (selectedDM ? dmHistory : messages) || [];
     const fileInputRef = useRef(null);
@@ -879,6 +880,7 @@ const ChatArea = ({
                     currentUser={currentUser}
                     selectedServer={selectedServer}
                     authToken={authToken}
+                    onRoleToggled={onRoleToggled}
                     onClose={() => setSelectedUserForProfile(null)}
                 />
             )}

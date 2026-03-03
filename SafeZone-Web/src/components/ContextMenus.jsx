@@ -45,6 +45,11 @@ export const ChannelContextMenu = ({ contextMenu, onDelete, onEdit, myPermission
 
 export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, onMute, onVolumeChange, volume = 1, isMuted = false, myPermissions, onKick, onBan, onAssignRole, onUnassignRole, serverRoles }) => {
     const [showRoleSubmenu, setShowRoleSubmenu] = useState(false);
+    const hideTimer = React.useRef(null);
+
+    const openSubmenu = () => { clearTimeout(hideTimer.current); setShowRoleSubmenu(true); };
+    const closeSubmenu = () => { hideTimer.current = setTimeout(() => setShowRoleSubmenu(false), 100); };
+
     if (!contextMenu) return null;
 
     const canKick = myPermissions ? hasPermission(myPermissions, PERMISSIONS.KICK_MEMBERS) : false;
@@ -90,16 +95,45 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, o
             <div style={{ height: '1px', background: '#333', margin: '5px 0' }}></div>
 
             {canManageRoles && serverRoles && serverRoles.length > 0 && (
-                <div style={{ position: 'relative' }}>
+                <div
+                    style={{ position: 'relative' }}
+                    onMouseEnter={openSubmenu}
+                    onMouseLeave={closeSubmenu}
+                >
                     <div
-                        onClick={() => setShowRoleSubmenu(prev => !prev)}
-                        style={{ padding: '8px 12px', color: '#fff', cursor: 'pointer', fontSize: '14px', borderRadius: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: showRoleSubmenu ? '#2f2f2f' : 'transparent' }}
+                        style={{
+                            padding: '8px 12px', color: '#ddd', cursor: 'pointer', fontSize: '14px',
+                            borderRadius: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            background: showRoleSubmenu ? '#3a3a3a' : 'transparent'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#3a3a3a'}
+                        onMouseLeave={e => { if (!showRoleSubmenu) e.currentTarget.style.background = 'transparent'; }}
                     >
                         <span>🏷️ Rol Ata</span>
-                        <span style={{ fontSize: '10px' }}>{showRoleSubmenu ? '▼' : '▶'}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.6 }}>▶</span>
                     </div>
+
                     {showRoleSubmenu && (
-                        <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px', margin: '2px 8px', overflow: 'hidden' }}>
+                        <div
+                            onMouseEnter={openSubmenu}
+                            onMouseLeave={closeSubmenu}
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: '100%',
+                                marginLeft: '2px',
+                                background: '#111',
+                                border: '1px solid #333',
+                                borderRadius: '4px',
+                                padding: '4px',
+                                minWidth: '160px',
+                                maxWidth: '220px',
+                                maxHeight: '300px',
+                                overflowY: 'auto',
+                                boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
+                                zIndex: 20001
+                            }}
+                        >
                             {serverRoles.map(role => {
                                 const isAssigned = hasRole(role.id);
                                 return (
@@ -110,13 +144,18 @@ export const UserContextMenu = ({ contextMenu, onAddFriend, onBlock, onCopyId, o
                                             if (isAssigned) onUnassignRole(contextMenu.user, role.id);
                                             else onAssignRole(contextMenu.user, role.id);
                                         }}
-                                        style={{ padding: '6px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '2px' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#2f2f2f'}
+                                        style={{
+                                            padding: '7px 10px', color: isAssigned ? '#fff' : '#aaa',
+                                            cursor: 'pointer', fontSize: '13px',
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            borderRadius: '3px', transition: 'background 0.1s'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#2a2a2a'}
                                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                     >
-                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: role.color, flexShrink: 0 }}></div>
-                                        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{role.name}</span>
-                                        {isAssigned && <span style={{ color: '#3ba55c', fontWeight: 'bold' }}>✓</span>}
+                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: role.color, flexShrink: 0 }} />
+                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{role.name}</span>
+                                        {isAssigned && <span style={{ color: '#3ba55c', fontSize: '12px', fontWeight: 'bold' }}>✓</span>}
                                     </div>
                                 );
                             })}
