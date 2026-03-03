@@ -69,6 +69,8 @@ const ChatArea = ({
     const [showPins, setShowPins] = React.useState(false);
     const [pinnedMessages, setPinnedMessages] = React.useState([]);
     const [pinsLoading, setPinsLoading] = React.useState(false);
+    // --- Edit History Modal ---
+    const [editHistoryModal, setEditHistoryModal] = React.useState(null); // { msgId, edits: [], loading: true }
 
     const canSendMessages = !selectedChannel || selectedDM || (myPermissions !== undefined ? hasPermission(myPermissions, PERMISSIONS.SEND_MESSAGES) : false);
     const canAttachFiles = !selectedChannel || selectedDM || (myPermissions !== undefined ? hasPermission(myPermissions, PERMISSIONS.ATTACH_FILES) : false);
@@ -537,7 +539,24 @@ const ChatArea = ({
                                                     >
                                                         {text}
                                                     </ReactMarkdown>
-                                                    {msg.edited_at && <span style={{ fontSize: '10px', color: '#72767d', marginLeft: '5px' }}>(düzenlendi)</span>}
+                                                    {msg.edited_at && (
+                                                        <span
+                                                            style={{ fontSize: '10px', color: '#72767d', marginLeft: '5px', cursor: 'pointer', borderBottom: '1px dotted #555', transition: 'color 0.1s' }}
+                                                            onMouseEnter={e => e.target.style.color = '#aaa'}
+                                                            onMouseLeave={e => e.target.style.color = '#72767d'}
+                                                            title="Düzenleme geçmişini göster"
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                if (!msg.id || !authToken) return;
+                                                                setEditHistoryModal({ msgId: msg.id, edits: [], loading: true });
+                                                                try {
+                                                                    const res = await fetch(getUrl(`/message/${msg.id}/edits?token=${authToken}`));
+                                                                    const data = await res.json();
+                                                                    setEditHistoryModal({ msgId: msg.id, edits: data.edits || [], loading: false });
+                                                                } catch { setEditHistoryModal({ msgId: msg.id, edits: [], loading: false }); }
+                                                            }}
+                                                        >(düzenlendi)</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -1014,6 +1033,62 @@ const ChatArea = ({
                     </div>
                 </div>
             </div>
+
+            {/* Edit History Modal */}
+            {editHistoryModal && (
+                <>
+                    <div
+                        onClick={() => setEditHistoryModal(null)}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 30000, backdropFilter: 'blur(2px)' }}
+                    />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%', left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: colors?.card || '#1e1f22',
+                        border: `1px solid ${colors?.border || 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '12px',
+                        padding: '0',
+                        zIndex: 30001,
+                        width: '480px',
+                        maxWidth: '90vw',
+                        maxHeight: '70vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
+                    }}>
+                        {/* Header */}
+                        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${colors?.border || 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '18px' }}>📝</span>
+                            <span style={{ fontWeight: 700, color: colors?.text || '#fff', fontSize: '15px' }}>Düzenleme Geçmişi</span>
+                            <button
+                                onClick={() => setEditHistoryModal(null)}
+                                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: colors?.textMuted || '#888', cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}
+                            >×</button>
+                        </div>
+                        {/* Body */}
+                        <div style={{ overflowY: 'auto', padding: '12px 20px', flex: 1 }}>
+                            {editHistoryModal.loading && (
+                                <div style={{ color: colors?.textMuted || '#888', textAlign: 'center', padding: '20px' }}>Yükleniyor...</div>
+                            )}
+                            {!editHistoryModal.loading && editHistoryModal.edits.length === 0 && (
+                                <div style={{ color: colors?.textMuted || '#888', textAlign: 'center', padding: '20px', fontSize: '13px' }}>Düzenleme geçmişi bulunamadı.<br /><span style={{ fontSize: '11px', opacity: 0.6 }}>(Eski düzenlemeler geçmişe kaydedilmemiş olabilir)</span></div>
+                            )}
+                            {editHistoryModal.edits.map((edit, idx) => (
+                                <div key={idx} style={{ marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: `1px solid ${colors?.border || 'rgba(255,255,255,0.05)'}`, position: 'relative' }}>
+                                    <div style={{ fontSize: '10px', color: colors?.textMuted || '#666', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ background: idx === 0 ? '#5865F2' : 'rgba(255,255,255,0.08)', color: idx === 0 ? '#fff' : (colors?.textMuted || '#aaa'), padding: '1px 7px', borderRadius: '10px', fontWeight: 600, fontSize: '10px' }}>
+                                            {idx === 0 ? 'Orijinal' : `Düzenleme ${idx}`}
+                                        </span>
+                                        <span>{new Date(edit.edited_at).toLocaleString('tr-TR')}</span>
+                                    </div>
+                                    <div style={{ fontSize: '13px', color: colors?.text || '#ddd', lineHeight: 1.5, wordBreak: 'break-word' }}>{edit.content}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* User Profile Card Modal Overlay */}
             {selectedUserForProfile && (

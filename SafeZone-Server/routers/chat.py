@@ -376,28 +376,64 @@ async def edit_message(data: dict):
         conn = get_db_connection()
         c = conn.cursor()
         
-        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        c.execute("SELECT id, is_sysadmin FROM users WHERE token = ?", (token,))
         user = c.fetchone()
         if not user: 
             conn.close()
             return {"status": "error", "message": "Invalid token"}
             
         # Verify ownership or SysAdmin
-        c.execute("SELECT sender_id FROM channel_messages WHERE id = ?", (message_id,))
+        c.execute("SELECT sender_id, content FROM channel_messages WHERE id = ?", (message_id,))
         msg = c.fetchone()
 
         is_owner = msg and msg['sender_id'] == user['id']
-        is_sysadmin = user.get('is_sysadmin')
+        is_sysadmin = user['is_sysadmin']
 
         if not msg or (not is_owner and not is_sysadmin):
             conn.close()
             return {"status": "error", "message": "Unauthorized"}
-            
+
+        # --- Save old content to edit history BEFORE updating ---
+        try:
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS message_edits (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL, content TEXT NOT NULL, edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(message_id) REFERENCES channel_messages(id) ON DELETE CASCADE)"
+            )
+            c.execute(
+                "INSERT INTO message_edits (message_id, content) VALUES (?, ?)",
+                (message_id, msg['content'])
+            )
+        except Exception:
+            pass  # Table might already exist
+
         c.execute("UPDATE channel_messages SET content = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?", 
                  (new_content, message_id))
         conn.commit()
         conn.close()
         return {"status": "success"}
+    except Exception as e:
+        return safe_error(e)
+
+@router.get("/message/{message_id}/edits")
+async def get_message_edits(message_id: int, token: str):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        # Check table exists
+        try:
+            c.execute(
+                "SELECT content, edited_at FROM message_edits WHERE message_id = ? ORDER BY edited_at ASC",
+                (message_id,)
+            )
+            rows = c.fetchall()
+        except Exception:
+            rows = []
+        conn.close()
+        return {"status": "success", "edits": [{"content": r['content'], "edited_at": r['edited_at']} for r in rows]}
     except Exception as e:
         return safe_error(e)
 
