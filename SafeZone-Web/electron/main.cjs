@@ -61,6 +61,10 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 });
 
 // ── AutoUpdater Handlers ──────────────────────────────────────────────────────
+const log = require('electron-log');
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+
 autoUpdater.channel = buildConfig.type === 'admin' ? 'admin' : 'latest';
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
