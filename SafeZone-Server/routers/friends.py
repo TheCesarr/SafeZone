@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from models import DMSend
 from database import get_db_connection
-from utils import log_event, safe_error
+from utils import log_event, safe_error, logger
 from state import lobby
 import sqlite3
 import datetime
@@ -321,12 +321,11 @@ async def send_dm(dm: DMSend):
                     "content": dm.content,
                     "timestamp": datetime.datetime.now().isoformat()
                 }))
-            except:
-                pass
-                
+            except Exception:
+                logger.exception("send_dm WebSocket push failed")
+
         return {"status": "success"}
     except Exception as e:
-        print(e)
         return safe_error(e)
 
 @router.post("/dm/history")

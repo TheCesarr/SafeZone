@@ -1,7 +1,7 @@
 {
   "name": "safezone-web",
   "private": true,
-  "version": "1.9.15",
+  "version": "1.9.16",
   "main": "electron/main.cjs",
   "type": "module",
   "description": "SafeZone - Secure Voice Chat",
@@ -27,6 +27,12 @@
     "files": [
       "dist/**/*",
       "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/server-config.json",
+        "to": "server-config.json"
+      }
     ],
     "win": {
       "target": "nsis",

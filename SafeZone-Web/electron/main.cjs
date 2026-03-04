@@ -1,5 +1,8 @@
 const { app, BrowserWindow, desktopCapturer, session, ipcMain, Notification } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// ── Build Config ──────────────────────────────────────────────────────────────
 let buildConfig = { type: 'client', adminSecret: '' };
 try {
     buildConfig = require('./build_config.cjs');
@@ -8,11 +11,45 @@ try {
     console.error("[Electron] Could not load build_config.cjs, defaulting to client.", e);
 }
 
-// Ignore SSL errors (MANDATORY for Self-Signed Certs)
+// ── Server Config (dynamic — edit server-config.json, no rebuild needed) ─────
+const SERVER_CONFIG_PATHS = [
+    // Packaged app: next to the .exe / app resources
+    path.join(process.resourcesPath || '', 'server-config.json'),
+    // Development: same folder as main.cjs
+    path.join(__dirname, 'server-config.json'),
+];
+
+let serverHost = '31.57.156.201';  // fallback if file is missing
+let serverPort = 8000;
+let useHttps = false;
+
+for (const configPath of SERVER_CONFIG_PATHS) {
+    try {
+        if (fs.existsSync(configPath)) {
+            const raw = fs.readFileSync(configPath, 'utf-8');
+            const cfg = JSON.parse(raw);
+            if (cfg.serverHost) serverHost = cfg.serverHost;
+            if (cfg.serverPort) serverPort = cfg.serverPort;
+            if (cfg.useHttps !== undefined) useHttps = cfg.useHttps;
+            console.log(`[Electron] Server config loaded from: ${configPath}`);
+            break;
+        }
+    } catch (e) {
+        console.warn(`[Electron] Could not read ${configPath}:`, e.message);
+    }
+}
+
+const SERVER_BASE = `${serverHost}:${serverPort}`;
+const SERVER_HTTP = `${useHttps ? 'https' : 'http'}://${SERVER_BASE}`;
+console.log(`[Electron] Using server: ${SERVER_HTTP} (useHttps=${useHttps})`);
+
+// ── Chromium Flags ────────────────────────────────────────────────────────────
 app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('allow-insecure-localhost', 'true');
-// Allow Microphone/Camera on HTTP for VDS IP
-app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', 'http://31.57.156.201');
+// Only needed for HTTP — HTTPS origins are already secure
+if (!useHttps) {
+    app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', SERVER_HTTP);
+}
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.disableHardwareAcceleration();
 
@@ -22,12 +59,16 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
     callback(true);
 });
 
-// IPC Handlers for Dual Build
+// ── IPC Handlers ──────────────────────────────────────────────────────────────
 ipcMain.handle('get-build-type', () => buildConfig.type);
 ipcMain.handle('get-admin-secret', () => buildConfig.adminSecret);
 
-// IPC Handler for Push Notifications
-// Only fires if the app window isn't focused (so no redundant pings)
+// Expose server address to renderer (so api.js can use it without hardcoding)
+ipcMain.handle('get-server-url', () => SERVER_BASE);
+// Expose full config so renderer can pick the right protocol
+ipcMain.handle('get-server-config', () => ({ host: serverHost, port: serverPort, useHttps }));
+
+// Push Notifications (only when window isn't focused)
 ipcMain.on('notify', (event, { title, body }) => {
     const windows = BrowserWindow.getAllWindows();
     const isFocused = windows.some(w => w.isFocused());
@@ -36,7 +77,7 @@ ipcMain.on('notify', (event, { title, body }) => {
     }
 });
 
-// IPC Handler: Return all screen + window sources with thumbnails for picker UI
+// Screen Sources for picker UI
 ipcMain.handle('get-sources', async () => {
     try {
         const sources = await desktopCapturer.getSources({
@@ -54,15 +95,14 @@ ipcMain.handle('get-sources', async () => {
     }
 });
 
+// ── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
         webPreferences: {
-            nodeIntegration: false, // Security: Disable nodeIntegration (we use preload)
-            contextIsolation: false, // We enabled contextIsolation=false in preload logic for now to expose window.SAFEZONE_API easily, or we can use true + contextBridge.
-            // Wait, my preload uses window.SAFEZONE_API and I said "contextIsolation: false".
-            // If I set nodeIntegration: false, I rely on preload.
+            nodeIntegration: false,
+            contextIsolation: false,
             preload: path.join(__dirname, 'preload.cjs'),
             webSecurity: false
         },
@@ -85,11 +125,8 @@ function createWindow() {
 
     win.once('ready-to-show', () => {
         win.show();
-        // DevTools: Ctrl+Shift+I veya F12 ile açılabilir
-        // win.webContents.openDevTools();
     });
 
-    // Retry logic for dev server startup race condition
     win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
         console.error(`[Electron] Failed to load: ${errorDescription} (${errorCode})`);
         if (errorCode === -102 || errorCode === -118) {
@@ -99,16 +136,10 @@ function createWindow() {
 
     win.setMenuBarVisibility(false);
 
-    // Screen Share Handler: renderer passes the chosen sourceId via getUserMedia constraints.
-    // We map it back to the correct desktopCapturer source.
     win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
         desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
-            // The renderer sends the sourceId via getUserMedia({ video: { mandatory: { chromeMediaSourceId } } })
-            // Electron passes this as request.frame with the chromeMediaSourceId embedded.
             const sourceId = request.frame.url.split('chromeMediaSourceId=')[1];
             const selectedSource = sources.find(source => source.id === sourceId);
-
-            // Fallback: first screen if nothing specific is requested or found.
             callback({ video: selectedSource || sources[0], audio: 'loopback' });
         }).catch((err) => {
             console.error(err);

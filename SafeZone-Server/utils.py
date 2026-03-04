@@ -1,9 +1,34 @@
+import sys
 import datetime
 import sqlite3
 import time as _time
 from database import get_db_connection
+from loguru import logger
 
-LOG_FILE = "server_log.txt"
+# ── Loguru Configuration ──────────────────────────────────────────────────────
+logger.remove()   # Remove default stderr handler
+
+# Terminal: colorized, DEBUG and above
+logger.add(
+    sys.stdout,
+    level="DEBUG",
+    colorize=True,
+    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}"
+)
+
+# File: INFO and above, rotate at 10 MB, keep 7 days, compress old files
+logger.add(
+    "server_log.txt",
+    level="INFO",
+    rotation="10 MB",
+    retention="7 days",
+    compression="zip",
+    encoding="utf-8",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{line} - {message}"
+)
+
+LOG_FILE = "server_log.txt"   # kept for any code that imports this name
+
 
 # --- FILE UPLOAD SECURITY ---
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -104,26 +129,20 @@ def rate_limit_check(identifier: str, action: str, max_attempts: int = 10, windo
     return True, None
 
 
+# ── Backward-compat shim for existing log_event() callers ────────────────────
+_LEVEL_MAP = {
+    "ERROR":      "error",
+    "CONNECT":    "info",
+    "DISCONNECT": "info",
+    "HTTP":       "info",
+    "WS":         "info",
+    "AUTH":       "info",
+    "WARNING":    "warning",
+}
+
 def log_event(event_type: str, message: str):
-    time_str = datetime.datetime.now().strftime("%H:%M:%S")
-    prefix = ""
-    if event_type == "CONNECT":
-        prefix = "[+] BAGLANDI"
-    elif event_type == "DISCONNECT":
-        prefix = "[-] AYRILDI "
-    elif event_type == "ERROR":
-        prefix = "[!] HATA    "
-    else:
-        prefix = f"[*] {event_type:<8}"
-    
-    log_line = f"{time_str} | {prefix} | {message}"
-    print(log_line)
-    
-    try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(log_line + "\n")
-    except Exception as e:
-        print(f"Log yazma hatasi: {e}")
+    level = _LEVEL_MAP.get(event_type.upper(), "info")
+    getattr(logger, level)(f"[{event_type}] {message}")
 
 # --- PERMISSION SYSTEM (Discord-style bitmask) ---
 
@@ -209,8 +228,8 @@ def check_permission(user_id: int, server_id: str, permission: int) -> bool:
         # 6. Check specific permission
         return bool(combined & permission)
         
-    except Exception as e:
-        print(f"Permission check error: {e}")
+    except Exception:
+        logger.exception("check_permission error")
         return False
 
 def get_user_permissions(user_id: int, server_id: str) -> int:
@@ -263,8 +282,8 @@ def get_user_permissions(user_id: int, server_id: str) -> int:
             
         return combined
         
-    except Exception as e:
-        print(f"Permission fetch error: {e}")
+    except Exception:
+        logger.exception("get_user_permissions error")
         return 0
 
 def get_user_by_token(token: str):
@@ -295,8 +314,8 @@ def check_server_membership(user_id: int, server_id: str) -> bool:
         result = c.fetchone()
         conn.close()
         return result is not None
-    except Exception as e:
-        print(f"check_server_membership error: {e}")
+    except Exception:
+        logger.exception("check_server_membership error")
         return False
 
 def check_channel_membership(user_id: int, channel_id: str) -> bool:
@@ -314,8 +333,8 @@ def check_channel_membership(user_id: int, channel_id: str) -> bool:
         if not channel:
             return False
         return check_server_membership(user_id, channel['server_id'])
-    except Exception as e:
-        print(f"check_channel_membership error: {e}")
+    except Exception:
+        logger.exception("check_channel_membership error")
         return False
 
 def create_audit_log(server_id: str, user_id: int, action: str, 
@@ -337,5 +356,5 @@ def create_audit_log(server_id: str, user_id: int, action: str,
                   (server_id, user_id, action, target_type, target_id, details))
         conn.commit()
         conn.close()
-    except Exception as e:
-        print(f"Audit log error: {e}")
+    except Exception:
+        logger.exception("create_audit_log error")

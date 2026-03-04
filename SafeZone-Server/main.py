@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
-from utils import log_event, LOG_FILE
+from utils import log_event, LOG_FILE, logger
 import uvicorn
 import os
 import datetime
@@ -45,15 +45,9 @@ async def root():
     return {"status": "online", "server": "SafeZone-TR-1", "auth_enabled": True}
 
 if __name__ == "__main__":
-    # Clear old log
-    with open(LOG_FILE, "w", encoding="utf-8") as f:
-        f.write(f"--- SERVER STARTED AT {datetime.datetime.now()} ---\n")
+    logger.info("============================================")
+    logger.info("   SAFEZONE SUNUCUSU BAŞLATILIYOR... 🚀")
+    logger.info("   (Loglar server_log.txt dosyasına kaydediliyor)")
+    logger.info("============================================")
 
-    print("============================================")
-    print("   SAFEZONE SUNUCUSU BAŞLATILIYOR... 🚀")
-    print("   (Modular Refactoring Active)")
-    print("   (Loglar server_log.txt dosyasina kaydediliyor)")
-    print("============================================")
-    
-    # SSL KALDIRILDI - SSH TUNEL ICIN HTTP GEREKLI
     uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="warning", reload=False)

@@ -1,0 +1,19 @@
+{
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "basic",
+    "extraPaths": [
+        "."
+    ],
+    "reportMissingImports": "warning",
+    "reportMissingModuleSource": "none",
+    "reportUnusedImport": "none",
+    "useLibraryCodeForTypes": true,
+    "venvPath": ".",
+    "include": [
+        "."
+    ],
+    "exclude": [
+        "__pycache__",
+        "uploads"
+    ]
+}
