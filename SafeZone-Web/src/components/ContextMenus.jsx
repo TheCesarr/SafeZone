@@ -211,7 +211,8 @@ export const MessageContextMenu = ({ contextMenu, onDelete, onEdit, onReply, onR
     const hoverOff = e => e.currentTarget.style.background = 'transparent';
 
     return (
-        <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '6px', padding: '4px', zIndex: 20000, minWidth: '150px', boxShadow: '0 8px 20px rgba(0,0,0,0.6)' }}>
+        <div className="message-context-menu" style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: '#111', border: '1px solid #333', borderRadius: '6px', padding: '4px', zIndex: 20000, minWidth: '150px', boxShadow: '0 8px 20px rgba(0,0,0,0.6)' }}>
+
             {onReactClick && (
                 <div onClick={(e) => { e.stopPropagation(); onReactClick(contextMenu); }} style={itemStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
                     <span>😊</span><span>Tepki Ekle</span>

@@ -629,9 +629,8 @@ const ChatArea = ({
                                                                     if (res.ok) {
                                                                         const data = await res.json();
                                                                         if (data.reactions !== undefined) {
-                                                                            // Optimistically update local state immediately
                                                                             const msgId = msg.id;
-                                                                            window.__szSetMessages && window.__szSetMessages(prev => prev.map(m =>
+                                                                            setMessages && setMessages(prev => prev.map(m =>
                                                                                 m.id === msgId ? { ...m, reactions: data.reactions } : m
                                                                             ));
                                                                         }

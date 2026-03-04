@@ -24,12 +24,17 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const [activeEmojiPickerId, setActiveEmojiPickerId] = useState(null);
     const [emojiPickerPosition, setEmojiPickerPosition] = useState(null);
 
-    // Close context menu on any click outside
+    // Close context menu when clicking outside it
     useEffect(() => {
-        const handler = () => setMessageContextMenu(null);
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        const handler = (e) => {
+            if (!e.target.closest('.message-context-menu')) {
+                setMessageContextMenu(null);
+            }
+        };
+        document.addEventListener('click', handler);
+        return () => document.removeEventListener('click', handler);
     }, []);
+
 
 
     // Infinite scroll state
