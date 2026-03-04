@@ -18,6 +18,7 @@ import AdminDashboard from './components/AdminDashboard';
 import CommandPalette from './components/CommandPalette';
 import StreamOverlay from './components/StreamOverlay';
 import Modal from './components/Modal';
+import UpdateNotifier from './components/UpdateNotifier';
 import { ServerContextMenu, UserContextMenu, MessageContextMenu, ChannelContextMenu } from './components/ContextMenus';
 import ToastContainer from './components/common/Toast';
 import { getUrl } from './utils/api';
@@ -535,7 +536,8 @@ const AppLayout = () => {
                 onSelectFriend={() => { }}
             />
 
-            {/* Toast */}
+            {/* Toast & Updater */}
+            <UpdateNotifier colors={colors} />
             <ToastContainer toasts={toasts} onRemove={removeToast} />
 
         </div>

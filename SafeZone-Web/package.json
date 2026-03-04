@@ -15,6 +15,7 @@
     "start:client": "node set-build.cjs client && npm run electron:dev",
     "start:admin": "node set-build.cjs admin && npm run electron:dev",
     "dist": "vite build && electron-builder",
+    "release": "vite build && electron-builder --publish always",
     "build:client": "node set-build.cjs client && vite build && electron-builder --config.productName=\"SafeZone Client\" --config.appId=\"com.safezone.client\"",
     "build:admin": "node set-build.cjs admin && vite build && electron-builder --config.productName=\"SafeZone Admin\" --config.appId=\"com.safezone.admin\""
   },
@@ -37,10 +38,16 @@
     "win": {
       "target": "nsis",
       "icon": "public/icon.ico"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "TheCesarr",
+      "repo": "SafeZone"
     }
   },
   "dependencies": {
     "@jitsi/rnnoise-wasm": "^0.2.1",
+    "electron-updater": "^6.8.3",
     "emoji-picker-react": "^4.18.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

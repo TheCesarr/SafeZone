@@ -1,6 +1,7 @@
 const { app, BrowserWindow, desktopCapturer, session, ipcMain, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 // ── Build Config ──────────────────────────────────────────────────────────────
 let buildConfig = { type: 'client', adminSecret: '' };
@@ -57,6 +58,32 @@ app.disableHardwareAcceleration();
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
     event.preventDefault();
     callback(true);
+});
+
+// ── AutoUpdater Handlers ──────────────────────────────────────────────────────
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('update-available', (info) => {
+    console.log('[AutoUpdater] Update available:', info.version);
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('update-available', info));
+});
+autoUpdater.on('update-downloaded', (info) => {
+    console.log('[AutoUpdater] Update downloaded:', info.version);
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('update-downloaded', info));
+});
+autoUpdater.on('download-progress', (progressObj) => {
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('update-progress', progressObj));
+});
+autoUpdater.on('error', (err) => {
+    console.error('[AutoUpdater] Error:', err);
+});
+
+ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall();
+});
+ipcMain.handle('check-for-updates', () => {
+    if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify();
 });
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
@@ -125,6 +152,9 @@ function createWindow() {
 
     win.once('ready-to-show', () => {
         win.show();
+        if (isPackaged) {
+            autoUpdater.checkForUpdatesAndNotify();
+        }
     });
 
     win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
