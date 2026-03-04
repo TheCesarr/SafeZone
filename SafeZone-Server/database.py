@@ -279,10 +279,21 @@ def run_migrations():
                 conn.commit()
                 print(f"[Migrations] ✓ v{version} applied.")
             except Exception as e:
-                conn.rollback()
-                raise RuntimeError(
-                    f"[Migrations] FAILED at v{version} ({description}): {e}"
-                ) from e
+                err_msg = str(e).lower()
+                # If the column/table already exists, the migration was already
+                # applied outside of the migration system — just mark it done.
+                if "duplicate column name" in err_msg or "already exists" in err_msg:
+                    print(f"[Migrations] ⚠ v{version} skipped (already applied outside migrations): {e}")
+                    conn.execute(
+                        "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (?, ?)",
+                        (version, description)
+                    )
+                    conn.commit()
+                else:
+                    conn.rollback()
+                    raise RuntimeError(
+                        f"[Migrations] FAILED at v{version} ({description}): {e}"
+                    ) from e
 
         print(f"[Migrations] Done. Applied {len(pending)} migration(s).")
     finally:
