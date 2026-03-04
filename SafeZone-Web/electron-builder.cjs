@@ -24,6 +24,7 @@ module.exports = {
         provider: "github",
         owner: "TheCesarr",
         repo: "SafeZone",
-        channel: buildConfig.type === 'admin' ? "admin" : "latest"
+        channel: buildConfig.type === 'admin' ? "admin" : "latest",
+        releaseType: "release"
     }
 };
