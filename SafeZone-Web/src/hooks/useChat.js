@@ -41,16 +41,24 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const connectToChannel = (channel) => {
         if (!channel || channel.type === 'voice') return;
 
+        // Immediately clear messages to prevent stale content from previous channel
+        setMessages([]);
+        currentChannelId.current = channel.id;
+
         if (chatWs.current) chatWs.current.close();
         const userId = authState.user?.username || uuid.current;
         const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(authState.token)}`, 'ws');
         chatWs.current = new WebSocket(wsUrl);
 
+        const connectedChannelId = channel.id; // capture at connection time
         chatWs.current.onmessage = (event) => {
             const msg = JSON.parse(event.data);
+            // Discard events from a previous channel's WS if we've moved on
+            if (currentChannelId.current !== connectedChannelId) return;
             handleIncomingMessage(msg);
         };
     }
+
 
     const handleIncomingMessage = (msg) => {
         if (msg.type === 'chat') {

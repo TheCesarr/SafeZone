@@ -220,35 +220,4 @@ async def reset_password(data: UserReset):
         traceback.print_exc()
         return safe_error(e, "reset")
 
-@router.post("/admin-login")
-async def admin_login(data: AdminLogin):
-    """Hidden endpoint for electron admin builds to auto-login"""
-    try:
-        from config import ADMIN_SECRET
-        if not ADMIN_SECRET or data.secret != ADMIN_SECRET:
-            return {"status": "error", "message": "Invalid admin secret"}
-
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # Find an existing sysadmin user
-        c.execute("SELECT * FROM users WHERE is_sysadmin = 1 LIMIT 1")
-        admin_user = c.fetchone()
-        
-        if not admin_user:
-            conn.close()
-            return {"status": "error", "message": "Gösterilecek sistem yöneticisi bulunamadı."}
-            
-        return {
-            "status": "success",
-            "token": admin_user["token"],
-            "username": admin_user["username"],
-            "display_name": admin_user["display_name"],
-            "discriminator": admin_user["discriminator"],
-            "avatar_url": admin_user["avatar_url"],
-            "avatar_color": admin_user["avatar_color"]
-        }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return safe_error(e, "admin-login")
+# (Duplicate /admin-login endpoint removed — the correct one is defined above at line 116)

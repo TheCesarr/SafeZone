@@ -688,6 +688,86 @@ async def pin_message(data: dict):
     except Exception as e:
         return safe_error(e)
 
+@router.post("/message/{message_id}/pin")
+async def pin_message_by_id(message_id: int, token: str, channel_id: str = None):
+    """Pin a message by ID (token + channel_id as query params)."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("SELECT channel_id, is_pinned FROM channel_messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg:
+            conn.close()
+            return {"status": "error", "message": "Message not found"}
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (msg['channel_id'],))
+        channel = c.fetchone()
+        if channel and not check_permission(user['id'], channel['server_id'], PERM_MANAGE_MESSAGES):
+            conn.close()
+            return {"status": "error", "message": "Yetkiniz yok!"}
+        c.execute("UPDATE channel_messages SET is_pinned = 1 WHERE id = ?", (message_id,))
+        conn.commit()
+        conn.close()
+        if channel:
+            create_audit_log(channel['server_id'], user['id'], "MESSAGE_PIN", "MESSAGE", str(message_id))
+        # Broadcast
+        channel_id_str = str(msg['channel_id'])
+        from state import rooms
+        import asyncio, json
+        if channel_id_str in rooms:
+            asyncio.create_task(broadcast(rooms[channel_id_str], json.dumps({
+                "type": "message_pinned",
+                "message_id": message_id,
+                "channel_id": channel_id_str
+            })))
+        return {"status": "success", "is_pinned": True}
+    except Exception as e:
+        return safe_error(e)
+
+@router.post("/message/{message_id}/unpin")
+async def unpin_message_by_id(message_id: int, token: str):
+    """Unpin a message by ID (token as query param)."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+        c.execute("SELECT channel_id, is_pinned FROM channel_messages WHERE id = ?", (message_id,))
+        msg = c.fetchone()
+        if not msg:
+            conn.close()
+            return {"status": "error", "message": "Message not found"}
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (msg['channel_id'],))
+        channel = c.fetchone()
+        if channel and not check_permission(user['id'], channel['server_id'], PERM_MANAGE_MESSAGES):
+            conn.close()
+            return {"status": "error", "message": "Yetkiniz yok!"}
+        c.execute("UPDATE channel_messages SET is_pinned = 0 WHERE id = ?", (message_id,))
+        conn.commit()
+        conn.close()
+        if channel:
+            create_audit_log(channel['server_id'], user['id'], "MESSAGE_UNPIN", "MESSAGE", str(message_id))
+        # Broadcast
+        channel_id_str = str(msg['channel_id'])
+        from state import rooms
+        import asyncio, json
+        if channel_id_str in rooms:
+            asyncio.create_task(broadcast(rooms[channel_id_str], json.dumps({
+                "type": "message_unpinned",
+                "message_id": message_id,
+                "channel_id": channel_id_str
+            })))
+        return {"status": "success", "is_pinned": False}
+    except Exception as e:
+        return safe_error(e)
+
 @router.get("/channel/{channel_id}/pins")
 async def get_pinned_messages(channel_id: str, token: str):
     """Get all pinned messages in a channel."""

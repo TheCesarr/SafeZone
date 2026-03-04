@@ -8,6 +8,9 @@ DB_NAME = "safezone.db"
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
+    # WAL mode: prevents "database is locked" errors under concurrent WebSocket writes
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")  # Safe performance boost with WAL
     return conn
 
 def migrate_db():
