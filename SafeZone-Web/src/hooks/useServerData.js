@@ -391,13 +391,14 @@ export const useServerData = (authState) => {
         friends, setFriends,
         friendRequests,
         serverMembers, setServerMembers,
-        serverRoles, // Fix 5: Exposed roles for ProfileCard
-        selectedServer, selectServer,
+        serverRoles,
+        selectedServer, selectServer, setSelectedServer,
         selectedChannel, setSelectedChannel,
 
         fetchServers,
         fetchMembers,
         fetchFriends,
+        fetchRoles,
 
         handleCreateServer,
         handleJoinServer,
