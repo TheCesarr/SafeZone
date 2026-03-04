@@ -24,6 +24,14 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const [activeEmojiPickerId, setActiveEmojiPickerId] = useState(null);
     const [emojiPickerPosition, setEmojiPickerPosition] = useState(null);
 
+    // Close context menu on any click outside
+    useEffect(() => {
+        const handler = () => setMessageContextMenu(null);
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+
     // Infinite scroll state
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -109,7 +117,19 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
                 }
                 return m;
             }));
+        } else if (msg.type === 'message_edited') {
+            setMessages(prev => prev.map(m =>
+                m.id === msg.message_id
+                    ? { ...m, content: msg.content, text: msg.content, edited_at: msg.edited_at || new Date().toISOString() }
+                    : m
+            ));
+        } else if (msg.type === 'message_pinned' || msg.type === 'message_unpinned') {
+            const isPinned = msg.type === 'message_pinned';
+            setMessages(prev => prev.map(m =>
+                m.id === msg.message_id ? { ...m, is_pinned: isPinned } : m
+            ));
         }
+
     }
 
     const fetchChannelMessages = async (channelId) => {

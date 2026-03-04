@@ -407,8 +407,25 @@ async def edit_message(data: dict):
 
         c.execute("UPDATE channel_messages SET content = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?", 
                  (new_content, message_id))
+        # Also need channel_id for broadcast
+        c.execute("SELECT channel_id FROM channel_messages WHERE id = ?", (message_id,))
+        ch_row = c.fetchone()
         conn.commit()
         conn.close()
+
+        # Broadcast edit to all clients in the channel room
+        if ch_row:
+            channel_id_str = str(ch_row['channel_id'])
+            from state import rooms
+            import asyncio, json
+            if channel_id_str in rooms:
+                asyncio.create_task(broadcast(rooms[channel_id_str], json.dumps({
+                    "type": "message_edited",
+                    "message_id": message_id,
+                    "content": new_content,
+                    "edited_at": str(datetime.datetime.utcnow().isoformat()) if hasattr(datetime, 'datetime') else ""
+                })))
+
         return {"status": "success"}
     except Exception as e:
         return safe_error(e)
@@ -655,6 +672,17 @@ async def pin_message(data: dict):
         action = "MESSAGE_PIN" if new_pin else "MESSAGE_UNPIN"
         if channel:
             create_audit_log(channel['server_id'], user['id'], action, "MESSAGE", str(message_id))
+
+        # Broadcast pin/unpin to all clients in the channel room
+        channel_id_str = str(msg['channel_id'])
+        from state import rooms
+        import asyncio, json
+        if channel_id_str in rooms:
+            asyncio.create_task(broadcast(rooms[channel_id_str], json.dumps({
+                "type": "message_pinned" if new_pin else "message_unpinned",
+                "message_id": message_id,
+                "channel_id": channel_id_str
+            })))
         
         return {"status": "success", "is_pinned": bool(new_pin)}
     except Exception as e:

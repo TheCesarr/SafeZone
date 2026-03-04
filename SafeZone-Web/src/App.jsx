@@ -26,7 +26,8 @@ import { useChat } from './hooks/useChat';
 import { useLobby } from './hooks/useLobby';
 import { useKeybinds } from './hooks/useKeybinds';
 
-import AdminDashboard from './components/AdminDashboard'; // Import AdminDashboard
+import AdminDashboard from './components/AdminDashboard';
+import CommandPalette from './components/CommandPalette';
 
 function App() {
   // --- 1. CONFIG & AUTH ---
@@ -34,6 +35,8 @@ function App() {
 
   // Toast Hook
   const { toasts, showToast, removeToast } = useToast();
+  // Command Palette
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
 
   // Auth Hook
   const { authState, authMode, setAuthMode, authError, setAuthError, handleLogin, handleRegister, handleResetPassword, handleLogout: hookLogout, handleAdminLogin, isLoading: authLoading, updateUser } = useAuth();
@@ -62,7 +65,18 @@ function App() {
   const unread = useUnread();
   const { keybinds, setKeybind, clearKeybind, isPTTMode, setIsPTTMode, getFriendlyName } = useKeybinds();
 
-  // Function to dynamically enrich local user state from global lobby updates
+  // Ctrl+K → Command Palette
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(p => !p);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
   const updateGlobalUsers = (usersArray) => {
     if (!usersArray || !serverData.serverMembers) return;
     serverData.setServerMembers(prev => {
@@ -907,8 +921,24 @@ function App() {
         )
       }
 
+      {/* COMMAND PALETTE (Ctrl+K) */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        servers={serverData.myServers || []}
+        friends={[]}
+        colors={colors}
+        onSelectChannel={(server, channel) => {
+          serverData.setSelectedServer(server);
+          serverData.setSelectedChannel(channel);
+        }}
+        onSelectFriend={() => { }}
+      />
+
+
       {/* TOAST NOTIFICATIONS */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
 
     </div >
   )

@@ -3,6 +3,57 @@ import UserFooter from './UserFooter';
 import { PERMISSIONS, hasPermission } from '../utils/permissions';
 import toast from '../utils/toast';
 
+// Collapsible category section for channels
+const CategorySection = ({ label, channels, colors, unreadChannels, renderChannelItem }) => {
+    const [collapsed, setCollapsed] = React.useState(false);
+    const hasUnread = channels.some(ch => unreadChannels?.has(ch.id));
+
+    return (
+        <div style={{ marginBottom: '4px' }}>
+            {/* Category Header */}
+            <div
+                onClick={() => setCollapsed(c => !c)}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    padding: '12px 4px 4px 4px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    color: colors?.textMuted || '#888',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = colors?.text || '#ccc'}
+                onMouseLeave={e => e.currentTarget.style.color = colors?.textMuted || '#888'}
+            >
+                {/* Chevron */}
+                <span style={{
+                    display: 'inline-block',
+                    fontSize: '9px',
+                    transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
+                    transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                    marginRight: '2px',
+                    lineHeight: 1,
+                }}>▾</span>
+                <span style={{ flex: 1 }}>{label}</span>
+                {/* Unread dot when collapsed */}
+                {collapsed && hasUnread && (
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ED4245', display: 'inline-block', flexShrink: 0 }} />
+                )}
+            </div>
+            {/* Channels */}
+            <div style={{
+                overflow: 'hidden',
+                maxHeight: collapsed ? '0px' : '9999px',
+                transition: 'max-height 0.22s cubic-bezier(0.4,0,0.2,1)',
+            }}>
+                {channels.map(ch => renderChannelItem(ch))}
+            </div>
+        </div>
+    );
+};
+
 
 const ChannelList = ({
     colors,
@@ -176,110 +227,117 @@ const ChannelList = ({
                         </div>
                     </div>
 
-                    <div style={{ flexGrow: 1, padding: '10px', overflowY: 'auto' }}>
-                        {selectedServer.channels?.filter(ch => {
-                            if (selectedServer.my_permissions === undefined) return true;
-                            return hasPermission(selectedServer.my_permissions, PERMISSIONS.VIEW_CHANNELS);
-                        }).map(ch => (
-                            <div key={ch.id}>
-                                <div
-                                    onClick={() => {
-                                        if (ch.type === 'voice') {
-                                            const canConnect = selectedServer.my_permissions !== undefined ? hasPermission(selectedServer.my_permissions, PERMISSIONS.CONNECT) : true;
-                                            if (!canConnect) {
-                                                // toast might be from react-hot-toast or react-toastify, use generic alert fallback if not handled
-                                                alert("Ses odasına bağlanma yetkiniz yok.");
-                                                return;
-                                            }
-                                        }
-                                        handleChannelClick(ch);
-                                    }}
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        setContextMenu({ x: e.clientX, y: e.clientY, channelId: ch.id, channel: ch });
-                                    }}
-                                    style={{
-                                        padding: '10px', marginBottom: '2px', borderRadius: '6px',
-                                        backgroundColor: selectedChannel?.id === ch.id ? (colors?.cardHover || '#333') : 'transparent',
-                                        color: selectedChannel?.id === ch.id ? (colors?.text || '#fff') : (activeVoiceChannel?.id === ch.id ? '#34C759' : (colors?.textMuted || '#888')),
-                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-                                        overflow: 'hidden'
-                                    }}
-                                >
-                                    <span style={{ flexShrink: 0 }}>{ch.type === 'voice' ? '🔊' : '💬'}</span>
-                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, fontWeight: unreadChannels?.has(ch.id) ? 'bold' : 'normal', color: unreadChannels?.has(ch.id) ? '#fff' : 'inherit' }}>{ch.name}</span>
-                                    {unreadChannels?.has(ch.id) && (() => {
-                                        const count = typeof unreadChannels.get === 'function' ? unreadChannels.get(ch.id) : 1;
-                                        return (
-                                            <div style={{
-                                                minWidth: '18px', height: '18px', borderRadius: '9px',
-                                                backgroundColor: '#ED4245', color: '#fff',
-                                                fontSize: '11px', fontWeight: 'bold',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                padding: '0 4px', marginLeft: 'auto', flexShrink: 0
-                                            }}>
-                                                {count > 99 ? '99+' : count}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                                {/* ACTIVE VOICE USERS AVATARS (Always from Lobby RoomDetails) */}
-                                {ch.type === 'voice' && roomDetails[ch.id] && roomDetails[ch.id].length > 0 && (
-                                    <div style={{ paddingLeft: '28px', marginBottom: '8px' }}>
-                                        {roomDetails[ch.id].map(uid => {
-                                            const member = serverMembers.find(m => m.username === uid || m.id === uid || m.uuid === uid);
-                                            const displayName = member ? (member.display_name || member.username) : uid;
-                                            const isCurrentUser = authState.user && (uid === authState.user.username || uid === authState.user.uuid);
+                    <div style={{ flexGrow: 1, padding: '8px', overflowY: 'auto' }}>
+                        {(() => {
+                            const textChannels = selectedServer.channels?.filter(ch => ch.type !== 'voice' && (selectedServer.my_permissions === undefined || hasPermission(selectedServer.my_permissions, PERMISSIONS.VIEW_CHANNELS))) || [];
+                            const voiceChannels = selectedServer.channels?.filter(ch => ch.type === 'voice' && (selectedServer.my_permissions === undefined || hasPermission(selectedServer.my_permissions, PERMISSIONS.VIEW_CHANNELS))) || [];
 
-                                            return (
-                                                <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                                    <div style={{
-                                                        width: '14px',
-                                                        height: '14px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#555',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontSize: '8px',
-                                                        color: 'white',
-                                                        border: speakingUsers.has(uid) ? '2px solid #34C759' : '2px solid transparent',
-                                                        boxShadow: speakingUsers.has(uid) ? '0 0 8px #34C759' : 'none',
-                                                        transition: 'all 0.2s ease'
-                                                    }}>
-                                                        {displayName.slice(0, 1).toUpperCase()}
-                                                    </div>
-                                                    <div
-                                                        onContextMenu={(e) => {
-                                                            if (handleUserContextMenu) {
-                                                                handleUserContextMenu(e, member || { username: uid }); // Fallback to minimal user obj
-                                                            }
-                                                        }}
-                                                        style={{ flex: 1, overflow: 'hidden', cursor: 'pointer' }}
-                                                    >
-                                                        <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }} title={displayName}>
-                                                            {displayName}
-                                                        </span>
-                                                    </div>
-                                                    {/* Show mute/deafen icons for all users */}
-                                                    {(() => {
-                                                        const userVoiceState = isCurrentUser ? { isMuted, isDeafened, isScreenSharing } : (voiceStates[uid] || {});
-                                                        return (userVoiceState.isMuted || userVoiceState.isDeafened || userVoiceState.isScreenSharing) && (
-                                                            <div style={{ display: 'flex', gap: '2px', marginLeft: '2px' }}>
-                                                                {userVoiceState.isScreenSharing && <span style={{ fontSize: '10px' }} title="Yayında">📺</span>}
-                                                                {userVoiceState.isMuted && <span style={{ fontSize: '10px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Muted">🎙️</span>}
-                                                                {userVoiceState.isDeafened && <span style={{ fontSize: '10px', filter: 'brightness(0) saturate(100%) invert(38%) sepia(77%) saturate(3430%) hue-rotate(343deg) brightness(99%) contrast(95%)' }} title="Deafened">🎧</span>}
-                                                            </div>
-                                                        )
-                                                    })()}
+                            const renderChannelItem = (ch) => {
+                                const isActive = selectedChannel?.id === ch.id;
+                                const isVoiceActive = activeVoiceChannel?.id === ch.id;
+                                const hasUnread = unreadChannels?.has(ch.id);
+                                const unreadCount = typeof unreadChannels?.get === 'function' ? unreadChannels.get(ch.id) : 1;
+
+                                return (
+                                    <div key={ch.id}>
+                                        <div
+                                            onClick={() => {
+                                                if (ch.type === 'voice') {
+                                                    const canConnect = selectedServer.my_permissions !== undefined ? hasPermission(selectedServer.my_permissions, PERMISSIONS.CONNECT) : true;
+                                                    if (!canConnect) { alert("Ses odasına bağlanma yetkiniz yok."); return; }
+                                                }
+                                                handleChannelClick(ch);
+                                            }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                setContextMenu({ x: e.clientX, y: e.clientY, channelId: ch.id, channel: ch });
+                                            }}
+                                            style={{
+                                                padding: '6px 10px',
+                                                marginBottom: '1px',
+                                                borderRadius: '6px',
+                                                backgroundColor: isActive ? (colors?.cardHover || 'rgba(255,255,255,0.1)') : 'transparent',
+                                                color: isActive ? (colors?.text || '#fff') : isVoiceActive ? '#34C759' : (colors?.textMuted || '#888'),
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                overflow: 'hidden',
+                                                transition: 'background 0.12s, color 0.12s',
+                                                fontWeight: hasUnread ? 700 : isActive ? 600 : 400,
+                                            }}
+                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = colors?.cardHover || 'rgba(255,255,255,0.06)'; }}
+                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                                        >
+                                            <span style={{ flexShrink: 0, opacity: isActive || isVoiceActive ? 1 : 0.7 }}>{ch.type === 'voice' ? '🔊' : '#'}</span>
+                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, fontSize: '14px', color: hasUnread ? (colors?.text || '#fff') : 'inherit' }}>{ch.name}</span>
+                                            {hasUnread && (
+                                                <div style={{ minWidth: '18px', height: '18px', borderRadius: '9px', backgroundColor: '#ED4245', color: '#fff', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', flexShrink: 0 }}>
+                                                    {unreadCount > 99 ? '99+' : unreadCount}
                                                 </div>
-                                            );
-                                        })}
+                                            )}
+                                        </div>
+                                        {/* ACTIVE VOICE USERS */}
+                                        {ch.type === 'voice' && roomDetails[ch.id] && roomDetails[ch.id].length > 0 && (
+                                            <div style={{ paddingLeft: '28px', marginBottom: '4px' }}>
+                                                {roomDetails[ch.id].map(uid => {
+                                                    const member = serverMembers.find(m => m.username === uid || m.id === uid || m.uuid === uid);
+                                                    const displayName = member ? (member.display_name || member.username) : uid;
+                                                    const isCurrentUser = authState.user && (uid === authState.user.username || uid === authState.user.uuid);
+                                                    return (
+                                                        <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                                            <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: 'white', border: speakingUsers.has(uid) ? '2px solid #34C759' : '2px solid transparent', boxShadow: speakingUsers.has(uid) ? '0 0 8px #34C759' : 'none', transition: 'all 0.2s ease' }}>
+                                                                {displayName.slice(0, 1).toUpperCase()}
+                                                            </div>
+                                                            <div onContextMenu={(e) => { if (handleUserContextMenu) handleUserContextMenu(e, member || { username: uid }); }} style={{ flex: 1, overflow: 'hidden', cursor: 'pointer' }}>
+                                                                <span style={{ fontSize: '11px', color: colors?.textMuted || '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }} title={displayName}>{displayName}</span>
+                                                            </div>
+                                                            {(() => {
+                                                                const userVoiceState = isCurrentUser ? { isMuted, isDeafened, isScreenSharing } : (voiceStates[uid] || {});
+                                                                return (userVoiceState.isMuted || userVoiceState.isDeafened || userVoiceState.isScreenSharing) && (
+                                                                    <div style={{ display: 'flex', gap: '2px', marginLeft: '2px' }}>
+                                                                        {userVoiceState.isScreenSharing && <span style={{ fontSize: '10px' }} title="Yayında">📺</span>}
+                                                                        {userVoiceState.isMuted && <span style={{ fontSize: '10px', opacity: 0.6 }} title="Muted">🔇</span>}
+                                                                        {userVoiceState.isDeafened && <span style={{ fontSize: '10px', opacity: 0.6 }} title="Deafened">🔕</span>}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        ))}
+                                );
+                            };
+
+                            return (
+                                <>
+                                    {/* TEXT CHANNELS CATEGORY */}
+                                    {textChannels.length > 0 && (
+                                        <CategorySection
+                                            label="METİN KANALLARI"
+                                            channels={textChannels}
+                                            colors={colors}
+                                            unreadChannels={unreadChannels}
+                                            renderChannelItem={renderChannelItem}
+                                        />
+                                    )}
+                                    {/* VOICE CHANNELS CATEGORY */}
+                                    {voiceChannels.length > 0 && (
+                                        <CategorySection
+                                            label="SES KANALLARI"
+                                            channels={voiceChannels}
+                                            colors={colors}
+                                            unreadChannels={unreadChannels}
+                                            renderChannelItem={renderChannelItem}
+                                        />
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
+
                 </>
             ) : (
                 <div style={{ flexGrow: 1, padding: '20px', color: colors?.textMuted || '#666', textAlign: 'center', marginTop: '50px' }}>
