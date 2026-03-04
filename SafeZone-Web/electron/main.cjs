@@ -61,6 +61,7 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 });
 
 // ── AutoUpdater Handlers ──────────────────────────────────────────────────────
+autoUpdater.channel = buildConfig.type === 'admin' ? 'admin' : 'latest';
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
