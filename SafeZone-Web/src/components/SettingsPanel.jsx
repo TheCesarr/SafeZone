@@ -450,8 +450,8 @@ const SettingsPanel = ({
                 </div>
             </div>
 
-            <div style={{ position: 'absolute', top: '20px', right: '40px', fontSize: '12px', color: 'rgba(255,255,255,0.2)' }}>
-                SafeZone v1.9.13
+            <div style={{ marginTop: 'auto', padding: '20px', textAlign: 'center', color: '#72767d', fontSize: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                SafeZone v1.9.19
             </div>
         </div>
     );
