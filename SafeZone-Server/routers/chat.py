@@ -1103,13 +1103,15 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
                  # --- SAVE TO DB ---
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("SELECT id, username FROM users WHERE username = ?", (data.get('sender', user_id),))
+                # Use the authenticated user_id from the token check at connection start
+                c.execute("SELECT id, username FROM users WHERE username = ?", (user_id,))
                 user_row = c.fetchone()
                 if user_row:
                     c.execute("SELECT server_id FROM channels WHERE id = ?", (room_id,))
                     chan = c.fetchone()
                     if chan and not check_permission(user_row['id'], chan['server_id'], PERM_SEND_MESSAGES):
                         conn.close()
+                        await websocket.send_text(json.dumps({"type": "error", "message": "Mesaj göndermek için yetkiniz yok."}))
                         continue
                     
                     if data.get('attachment_url'):

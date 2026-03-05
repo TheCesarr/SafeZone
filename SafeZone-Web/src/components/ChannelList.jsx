@@ -243,7 +243,7 @@ const ChannelList = ({
                                         <div
                                             onClick={() => {
                                                 if (ch.type === 'voice') {
-                                                    const canConnect = selectedServer.my_permissions !== undefined ? hasPermission(selectedServer.my_permissions, PERMISSIONS.CONNECT) : true;
+                                                    const canConnect = selectedServer.my_permissions !== undefined ? hasPermission(selectedServer.my_permissions, PERMISSIONS.CONNECT_VOICE) : true;
                                                     if (!canConnect) { alert("Ses odasına bağlanma yetkiniz yok."); return; }
                                                 }
                                                 handleChannelClick(ch);
