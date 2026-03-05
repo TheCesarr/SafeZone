@@ -148,6 +148,29 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
         });
     }
 
+    const deleteDM = async (msg) => {
+        if (!msg?.id) return;
+        try {
+            await fetch(getUrl('/dm/delete'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, message_id: msg.id })
+            });
+            setDmHistory(prev => prev.filter(m => m.id !== msg.id));
+        } catch (e) { console.error(e); }
+    }
+
+    const editDM = async (msgId, newContent) => {
+        try {
+            await fetch(getUrl('/dm/edit'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, message_id: msgId, content: newContent })
+            });
+            setDmHistory(prev => prev.map(m => m.id === msgId ? { ...m, content: newContent, text: newContent } : m));
+        } catch (e) { console.error(e); }
+    }
+
     return {
         onlineUserIds,
         userStatuses,
@@ -159,6 +182,8 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
 
         startDM,
         sendDM,
+        deleteDM,
+        editDM,
         handleStatusChange,
         connectToLobby
     };

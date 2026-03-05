@@ -268,9 +268,9 @@ const AppLayout = () => {
                                 inputText={chat.inputText}
                                 setInputText={chat.setInputText}
                                 onSendMessage={chat.sendChatMessage}
-                                onSendDM={() => lobby.sendDM(chat.inputText)}
-                                handleTyping={chat.handleTyping}
-                                typingUsers={chat.typingUsers}
+                                onSendDM={() => { lobby.sendDM(chat.inputText); chat.setInputText(''); }}
+                                handleTyping={lobby.selectedDM ? undefined : chat.handleTyping}
+                                typingUsers={lobby.selectedDM ? new Set() : chat.typingUsers}
                                 attachment={chat.attachment}
                                 setAttachment={chat.setAttachment}
                                 isUploading={chat.isUploading}
@@ -280,7 +280,10 @@ const AppLayout = () => {
                                 setEditingMessageId={chat.setEditingMessageId}
                                 editText={chat.editText}
                                 setEditText={chat.setEditText}
-                                submitEdit={chat.submitEdit}
+                                submitEdit={lobby.selectedDM
+                                    ? () => lobby.editDM(chat.editingMessageId, chat.editText).then(() => chat.setEditingMessageId(null))
+                                    : chat.submitEdit}
+                                handleDeleteMessage={lobby.selectedDM ? lobby.deleteDM : chat.handleDeleteMessage}
                                 onlineMembers={serverData.serverMembers || []}
                                 serverMembers={serverData.serverMembers || []}
                                 loadMoreMessages={chat.loadMoreMessages}
@@ -294,7 +297,7 @@ const AppLayout = () => {
                                 emojiPickerPosition={chat.emojiPickerPosition}
                                 setEmojiPickerPosition={chat.setEmojiPickerPosition}
                                 authToken={authState.token}
-                                setMessages={chat.setMessages}
+                                setMessages={lobby.selectedDM ? lobby.setDmHistory : chat.setMessages}
                                 serverRoles={serverData.serverRoles || []}
                                 selectedServer={serverData.selectedServer}
                                 onRoleToggled={() => serverData.fetchMembers(serverData.selectedServer?.id)}
@@ -500,8 +503,16 @@ const AppLayout = () => {
                 contextMenu={chat.messageContextMenu}
                 currentUser={authState.user}
                 myPermissions={serverData.selectedServer?.my_permissions}
-                onDelete={chat.handleDeleteMessage}
-                onEdit={(msg) => chat.startEditing(msg)}
+                onDelete={lobby.selectedDM ? lobby.deleteDM : chat.handleDeleteMessage}
+                onEdit={(msg) => {
+                    if (lobby.selectedDM) {
+                        chat.setEditingMessageId(msg.id);
+                        chat.setEditText(msg.content || msg.text || '');
+                        chat.setMessageContextMenu(null);
+                    } else {
+                        chat.startEditing(msg);
+                    }
+                }}
                 onReply={(msg) => { chat.setReplyingTo({ id: msg.id, sender: msg.sender, text: msg.text }); setTimeout(() => chat.setMessageContextMenu(null), 0); }}
                 onReactClick={(context) => { chat.setActiveEmojiPickerId(context.msg.id); chat.setEmojiPickerPosition({ x: context.x, y: context.y }); setTimeout(() => chat.setMessageContextMenu(null), 0); }}
                 onPin={async (msg) => {
