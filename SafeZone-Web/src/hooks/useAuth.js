@@ -37,16 +37,19 @@ export const useAuth = () => {
                             }
                         });
                     } else {
-                        // Token invalid — clear it and show login screen
+                        // Token explicitly rejected by server — clear it and show login screen
                         localStorage.removeItem('safezone_token');
                         setAuthState({ token: null, user: null });
                     }
                 } catch (e) {
-                    console.error("Verify Error", e);
-                    // Network error: keep token, try again next time
+                    // Network error (server temporarily unreachable) — keep the token, 
+                    // log user in with stored token so they don't lose their session
+                    console.warn("Verify network error — keeping stored token:", e.message);
+                    // Keep authState.token as-is (already set from storedToken above)
+                    // User will get proper user info once WebSocket connects
                 }
             }
-            setIsLoading(false);
+            setIsLoading(false); // Always called, regardless of success/error
         }
         checkToken();
     }, []);
