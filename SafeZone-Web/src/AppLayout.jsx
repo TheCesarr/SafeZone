@@ -286,9 +286,9 @@ const AppLayout = () => {
                                 handleDeleteMessage={lobby.selectedDM ? lobby.deleteDM : chat.handleDeleteMessage}
                                 onlineMembers={serverData.serverMembers || []}
                                 serverMembers={serverData.serverMembers || []}
-                                loadMoreMessages={chat.loadMoreMessages}
-                                hasMore={chat.hasMore}
-                                isLoadingMore={chat.isLoadingMore}
+                                loadMoreMessages={lobby.selectedDM ? lobby.loadMoreDMs : chat.loadMoreMessages}
+                                hasMore={lobby.selectedDM ? lobby.dmHasMore : chat.hasMore}
+                                isLoadingMore={lobby.selectedDM ? lobby.dmIsLoadingMore : chat.isLoadingMore}
                                 replyingTo={chat.replyingTo}
                                 setReplyingTo={chat.setReplyingTo}
                                 activeEmojiPickerId={chat.activeEmojiPickerId}

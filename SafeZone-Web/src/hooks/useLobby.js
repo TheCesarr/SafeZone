@@ -14,6 +14,8 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
     const [dmHistory, setDmHistory] = useState([]);
     const [selectedDM, setSelectedDM] = useState(null);
     const [dmTypingUser, setDmTypingUser] = useState(null);
+    const [dmHasMore, setDmHasMore] = useState(false);
+    const [dmIsLoadingMore, setDmIsLoadingMore] = useState(false);
     const dmTypingTimer = useRef(null);
 
     // Reconnect state
@@ -157,13 +159,34 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
             const res = await fetch(getUrl('/dm/history'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: authState.token, username: friend.username })
+                body: JSON.stringify({ token: authState.token, username: friend.username, limit: 50 })
             });
             const data = await res.json();
             if (data.status === 'success') {
                 setDmHistory(data.messages);
+                setDmHasMore(data.messages.length === 50);
             }
         } catch (e) { console.error(e); }
+    }
+
+    const loadMoreDMs = async () => {
+        if (!selectedDM || dmIsLoadingMore || !dmHasMore) return;
+        const firstId = dmHistory[0]?.id;
+        if (!firstId) return;
+        setDmIsLoadingMore(true);
+        try {
+            const res = await fetch(getUrl('/dm/history'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, username: selectedDM.username, before_id: firstId, limit: 50 })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                setDmHistory(prev => [...data.messages, ...prev]);
+                setDmHasMore(data.messages.length === 50);
+            }
+        } catch (e) { console.error(e); }
+        finally { setDmIsLoadingMore(false); }
     }
 
     const startDM = (friend) => {
@@ -236,10 +259,13 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
         ping,
         selectedDM, setSelectedDM,
         dmHistory, setDmHistory,
+        dmHasMore,
+        dmIsLoadingMore,
         dmTypingUser,
 
         startDM,
         sendDM,
+        loadMoreDMs,
         deleteDM,
         editDM,
         sendDMTyping,
