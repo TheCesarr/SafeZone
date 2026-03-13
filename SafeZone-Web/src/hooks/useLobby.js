@@ -13,8 +13,13 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
     // DM State
     const [dmHistory, setDmHistory] = useState([]);
     const [selectedDM, setSelectedDM] = useState(null);
-    const [dmTypingUser, setDmTypingUser] = useState(null); // username currently typing
+    const [dmTypingUser, setDmTypingUser] = useState(null);
     const dmTypingTimer = useRef(null);
+
+    // Reconnect state
+    const reconnectTimer = useRef(null);
+    const reconnectDelay = useRef(1000); // starts at 1s, max 30s
+    const shouldReconnect = useRef(true);
 
     // Connect
     const connectToLobby = () => {
@@ -98,11 +103,32 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
                 }
             } catch (e) { console.error("Lobby msg error", e); }
         };
+        lobbyWs.current.onerror = (err) => {
+            console.warn('[useLobby] WebSocket error:', err);
+        };
+
+        lobbyWs.current.onclose = (event) => {
+            console.warn(`[useLobby] Connection closed (code=${event.code}). shouldReconnect=${shouldReconnect.current}`);
+            if (!shouldReconnect.current) return;
+            // Schedule reconnect with exponential backoff
+            reconnectTimer.current = setTimeout(() => {
+                console.log(`[useLobby] Reconnecting after ${reconnectDelay.current}ms...`);
+                reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000);
+                connectToLobby();
+            }, reconnectDelay.current);
+        };
+
+        lobbyWs.current.onopen = () => {
+            console.log('[useLobby] Connected to Lobby WS.');
+            reconnectDelay.current = 1000; // Reset delay on successful connection
+        };
     }
 
-    // Ping Loop
+    // Ping Loop + Auto-Reconnect lifecycle
     useEffect(() => {
         if (authState.token) {
+            shouldReconnect.current = true;
+            reconnectDelay.current = 1000;
             connectToLobby();
             const interval = setInterval(() => {
                 if (lobbyWs.current?.readyState === WebSocket.OPEN) {
@@ -110,9 +136,12 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
                 }
             }, 5000);
             return () => {
+                // Signal onclose NOT to reconnect (token changed = logout)
+                shouldReconnect.current = false;
                 clearInterval(interval);
+                if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
                 if (lobbyWs.current) lobbyWs.current.close();
-            }
+            };
         }
     }, [authState.token]);
 
