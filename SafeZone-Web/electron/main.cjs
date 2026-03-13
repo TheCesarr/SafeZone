@@ -182,7 +182,23 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(createWindow);
+// ── Single Instance Lock & Startup ────────────────────────────────────────────
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        // Someone tried to run a second instance, focus our window instead.
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+
+    app.whenReady().then(createWindow);
+}
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

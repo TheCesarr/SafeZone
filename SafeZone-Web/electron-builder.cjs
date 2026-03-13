@@ -8,7 +8,9 @@ module.exports = {
     },
     files: [
         "dist/**/*",
-        "electron/**/*"
+        "electron/**/*",
+        "package.json",
+        "node_modules/**/*"
     ],
     extraResources: [
         {
