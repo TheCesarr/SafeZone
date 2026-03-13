@@ -5,6 +5,7 @@
   "main": "electron/main.cjs",
   "type": "module",
   "description": "SafeZone - Secure Voice Chat",
+  "author": "TheCesarr",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
