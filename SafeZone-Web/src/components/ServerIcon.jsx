@@ -1,9 +1,32 @@
 import React from 'react';
 import { getUrl } from '../utils/api';
 
+// Curated palette of vibrant, harmonious colors for server icons
+const SERVER_COLORS = [
+    '#5865F2', // Discord blue
+    '#EB459E', // Pink
+    '#57F287', // Green
+    '#FEE75C', // Yellow (text shadow helps)
+    '#ED4245', // Red
+    '#3BA55C', // Dark green
+    '#FAA61A', // Orange
+    '#9B59B6', // Purple
+    '#1ABC9C', // Teal
+    '#E67E22', // Warm orange
+    '#2980B9', // Ocean blue
+    '#E74C3C', // Crimson
+];
+
+const getServerColor = (serverId) => {
+    if (!serverId) return SERVER_COLORS[0];
+    const hash = String(serverId).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    return SERVER_COLORS[hash % SERVER_COLORS.length];
+};
+
 const ServerIcon = ({ server, selected, onClick, onContextMenu, hasUnread }) => {
     const [hovered, setHovered] = React.useState(false);
     const memberCount = server.member_count ?? server.members?.length ?? server.channels?.length ?? null;
+    const iconColor = getServerColor(server.id);
 
     return (
         <div style={{ position: 'relative', marginBottom: '10px' }}>
@@ -41,7 +64,7 @@ const ServerIcon = ({ server, selected, onClick, onContextMenu, hasUnread }) => 
                     width: '48px',
                     height: '48px',
                     borderRadius: selected ? '16px' : '50%',
-                    backgroundColor: selected ? '#5865F2' : '#333',
+                    backgroundColor: selected ? '#5865F2' : iconColor,
                     backgroundImage: server.icon ? `url(${getUrl(server.icon)})` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -54,7 +77,8 @@ const ServerIcon = ({ server, selected, onClick, onContextMenu, hasUnread }) => 
                     fontSize: server.icon ? '0' : '18px',
                     fontWeight: 'bold',
                     position: 'relative',
-                    boxShadow: selected ? '0 0 0 2px rgba(88,101,242,0.4)' : hovered ? '0 4px 16px rgba(0,0,0,0.4)' : 'none',
+                    boxShadow: selected ? '0 0 0 2px rgba(88,101,242,0.4)' : hovered ? `0 4px 16px ${iconColor}66` : 'none',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.4)',
                 }}
                 onMouseEnter={(e) => {
                     setHovered(true);
@@ -67,7 +91,7 @@ const ServerIcon = ({ server, selected, onClick, onContextMenu, hasUnread }) => 
                     setHovered(false);
                     if (!selected) {
                         e.currentTarget.style.borderRadius = '50%';
-                        e.currentTarget.style.backgroundColor = '#333';
+                        e.currentTarget.style.backgroundColor = iconColor;
                     }
                 }}
             >
