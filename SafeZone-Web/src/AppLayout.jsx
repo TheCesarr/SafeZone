@@ -269,8 +269,8 @@ const AppLayout = () => {
                                 setInputText={chat.setInputText}
                                 onSendMessage={chat.sendChatMessage}
                                 onSendDM={() => { lobby.sendDM(chat.inputText); chat.setInputText(''); }}
-                                handleTyping={lobby.selectedDM ? undefined : chat.handleTyping}
-                                typingUsers={lobby.selectedDM ? new Set() : chat.typingUsers}
+                                handleTyping={lobby.selectedDM ? lobby.sendDMTyping : chat.handleTyping}
+                                typingUsers={lobby.selectedDM ? (lobby.dmTypingUser ? new Set([lobby.dmTypingUser]) : new Set()) : chat.typingUsers}
                                 attachment={chat.attachment}
                                 setAttachment={chat.setAttachment}
                                 isUploading={chat.isUploading}
