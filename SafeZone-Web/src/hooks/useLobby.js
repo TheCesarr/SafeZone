@@ -13,6 +13,8 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
     // DM State
     const [dmHistory, setDmHistory] = useState([]);
     const [selectedDM, setSelectedDM] = useState(null);
+    const [dmTypingUser, setDmTypingUser] = useState(null); // username currently typing
+    const dmTypingTimer = useRef(null);
 
     // Connect
     const connectToLobby = () => {
@@ -74,6 +76,19 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
                     if (!selectedDM || selectedDM.username !== data.sender) {
                         if (onUnreadDM) onUnreadDM(data.sender);
                     }
+                } else if (data.type === 'dm_edited') {
+                    // Update the message content in DM history
+                    setDmHistory(prev => prev.map(m =>
+                        m.id === data.message_id ? { ...m, content: data.new_content, edited_at: new Date().toISOString() } : m
+                    ));
+                } else if (data.type === 'dm_deleted') {
+                    // Remove the deleted message from DM history
+                    setDmHistory(prev => prev.filter(m => m.id !== data.message_id));
+                } else if (data.type === 'dm_typing') {
+                    setDmTypingUser(data.sender);
+                    // Auto-clear typing indicator after 3 seconds
+                    if (dmTypingTimer.current) clearTimeout(dmTypingTimer.current);
+                    dmTypingTimer.current = setTimeout(() => setDmTypingUser(null), 3000);
                 } else if (data.type === 'friend_request') {
                     // Friend request notification
                     SoundManager.playMessage();
@@ -171,6 +186,19 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
         } catch (e) { console.error(e); }
     }
 
+    // Typing indicator — debounced: called when user types in DM input
+    const typingCooldown = useRef(null);
+    const sendDMTyping = () => {
+        if (!selectedDM) return;
+        if (typingCooldown.current) return; // Throttle: send at most once per 2s
+        typingCooldown.current = setTimeout(() => { typingCooldown.current = null; }, 2000);
+        fetch(getUrl('/dm/typing'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: authState.token, receiver_username: selectedDM.username })
+        }).catch(() => {});
+    }
+
     return {
         onlineUserIds,
         userStatuses,
@@ -179,11 +207,13 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
         ping,
         selectedDM, setSelectedDM,
         dmHistory, setDmHistory,
+        dmTypingUser,
 
         startDM,
         sendDM,
         deleteDM,
         editDM,
+        sendDMTyping,
         handleStatusChange,
         connectToLobby
     };

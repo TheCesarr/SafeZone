@@ -1,0 +1,128 @@
+# SafeZone — Tam Proje Audit Raporu
+**Tarih:** 2026-03-05
+
+---
+
+## ✅ Son Oturumda Düzeltilenler
+
+| # | Sorun | Dosya | Durum |
+|---|-------|-------|-------|
+| 1 | Ses odası girilemiyordu (`PERMISSIONS.CONNECT` → `CONNECT_VOICE`) | `ChannelList.jsx` | ✅ Düzeltildi |
+| 2 | Chat izin kontrolünde yanlış user lookup (`sender` → `user_id`) | `chat.py` | ✅ Düzeltildi |
+| 3 | Uygulama kapanıp açılınca oturum kaybı (token silme bug) | `useAuth.js` | ✅ Düzeltildi |
+| 4 | Güncelleme bildirimi görünmüyordu (IPC event kaçıyor) | `preload.cjs` | ✅ Düzeltildi |
+| 5 | DM chatbox gönderi sonrası temizlenmiyordu | `AppLayout.jsx` | ✅ Düzeltildi |
+| 6 | Typing indicator tüm chatbox'larda görünüyordu | `AppLayout.jsx` | ✅ Düzeltildi |
+| 7 | DM'de mesaj silme/düzenleme yoktu | `useLobby.js` + `AppLayout.jsx` | ✅ Düzeltildi |
+
+---
+
+## 🔴 Kritik Buglar (Hemen Düzeltilmeli)
+
+### 1. Recovery PIN şifreli değil
+**Dosya:** `database.py` + `auth.py`
+PIN `recovery_pin` alanında **düz metin** (plaintext) olarak saklanıyor. Biri DB'ye erişirse tüm kullanıcı PIN'lerini okuyabilir.
+```
+# Şu an:
+c.execute("... recovery_pin = ?", (user.recovery_pin,))  # DÜZDÜR!
+# Olması gereken: bcrypt veya sha256 hashlenmiş
+```
+
+### 2. DM typing indicator backend'i yok
+**Dosya:** `useLobby.js`
+DM ekranında "yazıyor..." eventi sessizce boş Set ile engellendi (frontend fix). Ama karşı taraf için de **DM yazıyor** bilgisi hiç gösterilemiyor çünkü Lobby WebSocket'inde `dm_typing` event tipi yok.
+
+### 3. DM mesaj silme/düzenleme karşı tarafa anlık yansımıyor
+**Dosya:** `friends.py` `/dm/delete`, `/dm/edit`
+Backend silme/düzenleme işi yapıyor ama **WebSocket broadcast yok**. Karşı kullanıcı sayfayı yenilemeden değişikliği görmüyor. `dm_received` benzeri `dm_deleted` / `dm_edited` eventle-ri Lobby WS üzerinden broadcast edilmeli.
+
+---
+
+## 🟡 Orta Öncelikli Sorunlar
+
+### 4. CORS tüm origin'lere açık
+**Dosya:** `main.py` satır 22
+```python
+allow_origins=["*"]  # GÜVENSİZ — production'da spesifik domain olmalı
+```
+Development için OK ama prod'da kapatılmalı.
+
+### 5. Admin login token paylaşımı
+**Dosya:** `auth.py` satır 135-136
+Admin login yapıldığında `admin` kullanıcısının token'ı değiştiriliyor. Eğer admin zaten normal client'te oturum açıksa, o oturum çıkış yapıyor. Token per-session yerine per-user.
+
+### 6. DM'de mesajlara tepki (react) yok
+**Dosya:** `useLobby.js`, `ChatArea.jsx`
+Sunucu mesajlarında emoji tepkisi mevcut (`/message/react`) ama DM için `/dm/react` endpoint'i yok. `ChatArea` DM modunda tepki butonunu gösteriyor ama tıklayınca server endpoint'ini çağırıyor — DM'de çalışmaz.
+
+### 7. DM geçmişi sadece son 50 mesaj
+**Dosya:** `friends.py` `/dm/history`
+DM kanalında infinite scroll / pagination yok (`limit=50` hardcoded). Sunucu text kanalları sayfalama destekliyor (`before` parametresi) ama DM yok.
+
+### 8. Lobby WS yeniden bağlanma yok
+**Dosya:** `useLobby.js`
+WebSocket koptuğunda (`onclose`, `onerror`) otomatik yeniden bağlanma kodu yok. Bağlantı kesilirse kullanıcı çevrimiçi listesinden düşüyor ve DM gelemiyor.
+
+### 9. Ses odasında konuşma izin kontrolü yok
+**Dosya:** `chat.py` room WebSocket handler
+Ses odasına girildiğinde `PERM_CONNECT_VOICE` kontrolü yapılıyor (frontend'de) ama `PERM_SPEAK` (2048) kontrolü **ne frontend'de ne backend'de yapılıyor**. `SPEAK` izni olan roller anlık olarak sessiz/konuşan ayrımı yapamıyor.
+
+### 10. Attachments klasörü temizlenmiyor
+**Dosya:** `uploads/`
+Kullanıcı dosya yüklediğinde `uploads/` klasörüne ekleniyor. Silinmiş mesajların attachmentları diskten temizlenmiyor — upload klasörü sonsuz büyüme riski.
+
+---
+
+## 🟢 İyileştirme Önerileri (Düşük Öncelik)
+
+### 11. Sunucu arama/filtreleme yok
+Çok kanallı sunucularda kanal / üye arama özelliği yok. Komut paleti var (`CommandPalette.jsx`) ama kanal arama zayıf.
+
+### 12. Kullanıcı engelleme (block) sistemi eksik
+DB'de `blocked_users` tablosu yok. Frontend'de "Engelle" butonu görünüyor ama backend desteği yok.
+
+### 13. Mesaj bildirim ayarları yok
+Kanal bazında bildirim susturma (mute channel) seçeneği yok. Tüm kanallar eşit öncelikle bildirim gönderiyor.
+
+### 14. Sunucu ikonu fallback aynı
+`ServerSidebar.jsx` — Sunucu ikonu yokken fallback olarak sunucu adının ilk harfi gösteriliyor ama tüm ikonlar aynı renge sahip. Sunucu ID'sine göre renk varyasyonu yok.
+
+### 15. Build boyutu büyük
+Vite çıktısı ~1.9 MB JS (gzip'te ~1.3 MB). `build.rollupOptions.output.manualChunks` ile code splitting yapılabilir. Uygulama başlangıç süresi iyileşir.
+
+### 16. Ses kalitesi sabit
+WebRTC'de ses kalitesi (bitrate, echo cancellation, noise suppression) ayarlanabilir değil. `SettingsPanel` ses cihazı seçiyor ama konfigürasyon yok.
+
+### 17. Uygulama versiyonu backend ile senkronize değil
+`main.py` satır 14: `version="1.0.1"` hardcoded — frontend'de `1.9.22`. İki versiyon bağımsız takip ediliyor.
+
+---
+
+## 📊 Genel Durum Özeti
+
+| Alan | Durum |
+|------|-------|
+| Auth (giriş/kayıt/reset) | ✅ Çalışıyor, bcrypt OK |
+| Sunucu/Kanal yönetimi | ✅ Tamam |
+| Server mesajlaşma | ✅ Tamam (edit/delete/react/pin) |
+| Rol & Yetki sistemi | ✅ Tamam (son bug düzeltildi) |
+| Sesli oda (WebRTC) | 🟡 Çalışıyor, SPEAK izni eksik |
+| DM sistemi | 🟡 Temel çalışıyor, anlık edit/delete/typing yok |
+| Güncelleme sistemi | ✅ Tamam (v1.9.22'de düzeltildi) |
+| Oturum yönetimi | ✅ Tamam (v1.9.21'de düzeltildi) |
+| Güvenlik | 🔴 PIN plaintext, CORS açık |
+
+---
+
+## 📋 Öncelikli Yapılacaklar Listesi
+
+1. **🔴 [KRİTİK]** Recovery PIN'i hashle (bcrypt veya SHA256)
+2. **🔴 [KRİTİK]** DM silme/düzenleme → Lobby WS'den broadcast et (`dm_deleted`, `dm_edited`)
+3. **🟡 [ORTA]** DM typing indicator → Lobby WS'e `dm_typing` eventi ekle
+4. **🟡 [ORTA]** DM için `/dm/react` endpoint ve frontend desteği
+5. **🟡 [ORTA]** DM mesajları için pagination (`before` parametresi)
+6. **🟡 [ORTA]** Lobby WebSocket auto-reconnect
+7. **🟡 [ORTA]** `SPEAK` (2048) izin kontrolü sesli odalarda
+8. **🟢 [DÜŞÜK]** Kullanıcı engelleme sistemi
+9. **🟢 [DÜŞÜK]** Upload dosya temizleme (silinmiş mesaj attachmentları)
+10. **🟢 [DÜŞÜK]** CORS origin'lerini production'da kısıtla

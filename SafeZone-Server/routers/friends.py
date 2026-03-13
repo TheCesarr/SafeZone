@@ -414,8 +414,26 @@ async def edit_dm(data: dict):
         c.execute("UPDATE messages SET content = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?",
                   (new_content, message_id))
         conn.commit()
+
+        # Get receiver username to broadcast
+        c.execute('''
+            SELECT u.username FROM messages m
+            JOIN users u ON m.receiver_id = u.id
+            WHERE m.id = ?
+        ''', (message_id,))
+        receiver_row = c.fetchone()
         conn.close()
-        
+
+        # Broadcast dm_edited to receiver if online
+        if receiver_row and receiver_row['username'] in lobby.active_connections:
+            try:
+                await lobby.active_connections[receiver_row['username']].send_text(json.dumps({
+                    "type": "dm_edited",
+                    "message_id": message_id,
+                    "new_content": new_content
+                }))
+            except: pass
+
         return {"status": "success"}
     except Exception as e:
         return safe_error(e)
@@ -444,8 +462,57 @@ async def delete_dm(data: dict):
         
         c.execute("DELETE FROM messages WHERE id = ?", (message_id,))
         conn.commit()
+
+        # Get receiver username to broadcast
+        c.execute('''
+            SELECT u.username FROM messages m
+            JOIN users u ON m.receiver_id = u.id
+            WHERE m.id = ?
+        ''', (message_id,))
+        receiver_row = c.fetchone()
         conn.close()
-        
+
+        # Broadcast dm_deleted to receiver if online
+        if receiver_row and receiver_row['username'] in lobby.active_connections:
+            try:
+                await lobby.active_connections[receiver_row['username']].send_text(json.dumps({
+                    "type": "dm_deleted",
+                    "message_id": message_id
+                }))
+            except: pass
+
+        return {"status": "success"}
+    except Exception as e:
+        return safe_error(e)
+
+@router.post("/dm/typing")
+async def dm_typing(data: dict):
+    """Broadcast a typing indicator to the receiver via Lobby WS."""
+    try:
+        token = data.get('token')
+        receiver_username = data.get('receiver_username')
+
+        if not token or not receiver_username:
+            return {"status": "error", "message": "Missing fields"}
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE token = ?", (token,))
+        user = c.fetchone()
+        conn.close()
+
+        if not user:
+            return {"status": "error", "message": "Invalid token"}
+
+        # Broadcast to receiver if online
+        if receiver_username in lobby.active_connections:
+            try:
+                await lobby.active_connections[receiver_username].send_text(json.dumps({
+                    "type": "dm_typing",
+                    "sender": user['username']
+                }))
+            except: pass
+
         return {"status": "success"}
     except Exception as e:
         return safe_error(e)

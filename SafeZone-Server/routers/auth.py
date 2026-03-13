@@ -53,8 +53,10 @@ async def register(user: UserRegister, request: Request):
         token = secrets.token_hex(16)
         
         try:
+            # Hash the recovery PIN before storing
+            hashed_pin = bcrypt.hashpw(str(user.recovery_pin).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             c.execute("INSERT INTO users (username, discriminator, email, password_hash, display_name, token, recovery_pin) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                      (user.username, discriminator, user.email, hashed_pw_str, user.display_name, token, user.recovery_pin))
+                      (user.username, discriminator, user.email, hashed_pw_str, user.display_name, token, hashed_pin))
             conn.commit()
         except sqlite3.IntegrityError:
             conn.close()
@@ -201,8 +203,15 @@ async def reset_password(data: UserReset):
             conn.close()
             return {"status": "error", "message": "Kullanıcı bulunamadı."}
             
-        # Check PIN
-        if user['recovery_pin'] != data.recovery_pin:
+        # Check PIN (bcrypt compare)
+        stored_pin = user['recovery_pin']
+        try:
+            # Try bcrypt comparison (new hashed PINs)
+            pin_ok = bcrypt.checkpw(str(data.recovery_pin).encode('utf-8'), stored_pin.encode('utf-8'))
+        except Exception:
+            # Fallback: legacy plaintext PINs (for old accounts before the fix)
+            pin_ok = (stored_pin == str(data.recovery_pin))
+        if not pin_ok:
             conn.close()
             return {"status": "error", "message": "Kurtarma PIN kodu hatalı!"}
             
