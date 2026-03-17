@@ -381,9 +381,26 @@ export const useServerData = (authState) => {
     }
 
     const blockUser = async (user) => {
-        if (!window.confirm(`${user.username} engellensin mi?`)) return;
-        // Mock Implementation or Real Endpoint if exists
-        toast.warning("Engelleme özelliği yakında!");
+        if (!window.confirm(`${user.username || user} engellensin mi? Bu kullanıcıya DM atamaz ve bu kullanıcıdan DM alamazsınız.`)) return;
+        try {
+            const username = typeof user === 'string' ? user : user.username;
+            const res = await fetch(getUrl('/user/block'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: authState.token, username })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast.warning(`${username} engellendi.`);
+                // Remove from friends list if they were a friend
+                setFriends(prev => prev.filter(f => f.username !== username));
+            } else {
+                toast.error(data.message || 'Engelleme başarısız.');
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error('Bağlantı hatası.');
+        }
     }
 
     return {

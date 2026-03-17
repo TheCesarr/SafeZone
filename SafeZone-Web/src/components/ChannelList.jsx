@@ -352,6 +352,7 @@ const ChannelList = ({
                 activeVoiceChannel={activeVoiceChannel}
                 selectedServer={selectedServer}
                 isMuted={isMuted}
+                canSpeak={canSpeak}
                 isDeafened={isDeafened}
                 isNoiseCancelled={isNoiseCancelled}
                 isScreenSharing={isScreenSharing}

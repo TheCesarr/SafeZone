@@ -304,12 +304,23 @@ async def send_dm(dm: DMSend):
         if not receiver:
             conn.close()
             return {"status": "error", "message": "Kullanıcı bulunamadı"}
+
+        # 3. Block check: reject if either party has blocked the other
+        c.execute("""
+            SELECT 1 FROM block_list
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+        """, (sender['id'], receiver['id'], receiver['id'], sender['id']))
+        if c.fetchone():
+            conn.close()
+            return {"status": "error", "message": "Bu kullanıcıya mesaj gönderemezsiniz."}
             
-        # 3. Save message
+        # 4. Save message
         c.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)", 
                   (sender['id'], receiver['id'], dm.content))
         conn.commit()
         conn.close()
+
         
         # 4. Real-time push via Lobby WebSocket
         if dm.receiver_username in lobby.active_connections:

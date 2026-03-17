@@ -11,19 +11,36 @@ import datetime
 from routers import auth, server, channel, friends, chat, user, admin
 
 # App Init
-app = FastAPI(title="SafeZone Backend", version="1.0.1")
+app = FastAPI(title="SafeZone Backend", version="1.0.2")
 
 # Setup
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+
+# CORS: read from env for production hardening
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = (
+    [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    if _raw_origins
+    else [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost",
+        "http://31.57.156.201",
+        "https://31.57.156.201",
+        "app://.",           # Electron renderer
+    ]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Init Database
 init_db()

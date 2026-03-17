@@ -233,6 +233,19 @@ MIGRATIONS = [
     # ADD NEW MIGRATIONS BELOW THIS LINE
     # Format: (version_number, "Short description", "SQL;")
     # ─────────────────────────────────────────────────────────────────────────
+
+    # ── v4: user blocking system
+    (4, "Add block_list table",
+     """
+     CREATE TABLE IF NOT EXISTS block_list (
+         blocker_id INTEGER NOT NULL,
+         blocked_id INTEGER NOT NULL,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (blocker_id, blocked_id),
+         FOREIGN KEY(blocker_id) REFERENCES users(id) ON DELETE CASCADE,
+         FOREIGN KEY(blocked_id) REFERENCES users(id) ON DELETE CASCADE
+     );
+     """),
 ]
 
 

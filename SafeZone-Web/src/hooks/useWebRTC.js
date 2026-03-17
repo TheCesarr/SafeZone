@@ -21,6 +21,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     const animationFrameRef = useRef(null);
 
     // State
+    const [canSpeak, setCanSpeak] = useState(true);
     const [isMuted, setIsMuted] = useState(false);
     const [isDeafened, setIsDeafened] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -104,7 +105,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
     });
 
     // --- MAIN CONNECTION LOGIC ---
-    const connectToRoom = async (channel) => {
+    const connectToRoom = async (channel, hasSpeakPermission = true) => {
         if (connectingRef.current === channel.id) return;
         if (activeVoiceChannel?.id === channel.id && roomWs.current?.readyState === WebSocket.OPEN) return;
 
@@ -123,7 +124,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         }
 
         if (channel.type === 'voice') {
-            await startVoiceMedia(channel);
+            await startVoiceMedia(channel, hasSpeakPermission);
         }
 
         if (connectingRef.current !== channel.id) return;
@@ -136,45 +137,60 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
         roomWs.current.onopen = () => {
             if (channel.type === 'voice') {
-                sendSignal({ type: 'user_state', is_muted: isMuted, is_deafened: isDeafened, is_screen_sharing: isScreenSharing });
+                sendSignal({ type: 'user_state', is_muted: hasSpeakPermission ? isMuted : true, is_deafened: isDeafened, is_screen_sharing: isScreenSharing });
             }
         }
 
         roomWs.current.onmessage = handleVoiceMessage;
     }
 
-    const startVoiceMedia = async (channel) => {
+    const startVoiceMedia = async (channel, hasSpeakPermission) => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    deviceId: selectedInputId && selectedInputId !== 'default' ? { exact: selectedInputId } : undefined,
-                    echoCancellation: audioSettings?.echoCancellation ?? true,
-                    noiseSuppression: audioSettings?.noiseSuppression ?? true,
-                    autoGainControl: audioSettings?.autoGainControl ?? true
-                },
-                video: false // Initial connection is AUDIO ONLY. Video/Screen added later.
-            })
+            setCanSpeak(hasSpeakPermission);
+            if (!hasSpeakPermission) {
+                setIsMuted(true);
+            }
+
+            let stream;
+            if (hasSpeakPermission) {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        deviceId: selectedInputId && selectedInputId !== 'default' ? { exact: selectedInputId } : undefined,
+                        echoCancellation: audioSettings?.echoCancellation ?? true,
+                        noiseSuppression: audioSettings?.noiseSuppression ?? true,
+                        autoGainControl: audioSettings?.autoGainControl ?? true
+                    },
+                    video: false // Initial connection is AUDIO ONLY. Video/Screen added later.
+                });
+            } else {
+                // Empty stream for listeners
+                stream = new MediaStream();
+            }
+
             localStream.current = stream;
             setActiveVoiceChannel(channel);
 
-            stream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+            if (hasSpeakPermission) {
+                stream.getAudioTracks().forEach(t => t.enabled = !isMuted);
 
-            if (isNoiseCancelled) {
-                try {
-                    const ns = new NoiseSuppression();
-                    const processed = await ns.init(stream);
-                    if (processed && processed !== stream) {
-                        noiseSuppressionRef.current = ns;
-                        processedStreamRef.current = processed;
-                        console.log('[useWebRTC] RNNoise noise suppression active');
+                if (isNoiseCancelled) {
+                    try {
+                        const ns = new NoiseSuppression();
+                        const processed = await ns.init(stream);
+                        if (processed && processed !== stream) {
+                            noiseSuppressionRef.current = ns;
+                            processedStreamRef.current = processed;
+                            console.log('[useWebRTC] RNNoise noise suppression active');
+                        }
+                    } catch (e) {
+                        console.error('[useWebRTC] Failed to init noise suppression:', e);
                     }
-                } catch (e) {
-                    console.error('[useWebRTC] Failed to init noise suppression:', e);
                 }
+
+                setupVoiceActivityDetection(stream);
             }
 
             SoundManager.playJoin();
-            setupVoiceActivityDetection(stream);
         } catch (e) {
             toast.error("Mikrofon izni gerekli.");
             console.error(e);
@@ -493,7 +509,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
 
     // --- CONTROLS ---
     const toggleMute = () => {
-        if (isDeafened) return;
+        if (!canSpeak || isDeafened) return;
         const newMuted = !isMuted;
         setIsMuted(newMuted);
         SoundManager.playMute(newMuted);
@@ -693,6 +709,7 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         connectedUsers,
         speakingUsers,
         voiceStates,
+        canSpeak,
         isMuted,
         isDeafened,
         isScreenSharing,

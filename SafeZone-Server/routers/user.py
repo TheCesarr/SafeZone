@@ -235,6 +235,112 @@ async def update_status(data: StatusUpdateParam):
         
         await broadcast_room_update()
         
-        return {"status": "success"}
+        return {\"status\": \"success\"}
     except Exception as e:
         return safe_error(e)
+
+# ── User Blocking ──────────────────────────────────────────────────────────────
+
+@router.post("/block")
+async def block_user(data: dict):
+    """Block a user — they can no longer DM you and you can no longer DM them."""
+    try:
+        token = data.get('token')
+        target_username = data.get('username')
+        if not token or not target_username:
+            return {"status": "error", "message": "Missing fields"}
+
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        me = c.fetchone()
+        if not me:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+
+        c.execute("SELECT id FROM users WHERE username = ?", (target_username,))
+        target = c.fetchone()
+        if not target:
+            conn.close()
+            return {"status": "error", "message": "User not found"}
+
+        if me['id'] == target['id']:
+            conn.close()
+            return {"status": "error", "message": "Cannot block yourself"}
+
+        c.execute(
+            "INSERT OR IGNORE INTO block_list (blocker_id, blocked_id) VALUES (?, ?)",
+            (me['id'], target['id'])
+        )
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"{target_username} engellendi."}
+    except Exception as e:
+        return safe_error(e)
+
+
+@router.post("/unblock")
+async def unblock_user(data: dict):
+    """Remove a block."""
+    try:
+        token = data.get('token')
+        target_username = data.get('username')
+        if not token or not target_username:
+            return {"status": "error", "message": "Missing fields"}
+
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        me = c.fetchone()
+        if not me:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+
+        c.execute("SELECT id FROM users WHERE username = ?", (target_username,))
+        target = c.fetchone()
+        if not target:
+            conn.close()
+            return {"status": "error", "message": "User not found"}
+
+        c.execute(
+            "DELETE FROM block_list WHERE blocker_id = ? AND blocked_id = ?",
+            (me['id'], target['id'])
+        )
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"{target_username} engellemesi kaldırıldı."}
+    except Exception as e:
+        return safe_error(e)
+
+
+@router.post("/blocked")
+async def get_blocked_list(data: dict):
+    """Return the list of users the caller has blocked."""
+    try:
+        token = data.get('token')
+        if not token:
+            return {"status": "error", "message": "Missing token"}
+
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        c.execute("SELECT id FROM users WHERE token = ?", (token,))
+        me = c.fetchone()
+        if not me:
+            conn.close()
+            return {"status": "error", "message": "Invalid token"}
+
+        c.execute("""
+            SELECT u.username, u.display_name, u.discriminator, u.avatar_url, u.avatar_color
+            FROM block_list bl
+            JOIN users u ON bl.blocked_id = u.id
+            WHERE bl.blocker_id = ?
+        """, (me['id'],))
+        blocked = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return {"status": "success", "blocked": blocked}
+    except Exception as e:
+        return safe_error(e)
+

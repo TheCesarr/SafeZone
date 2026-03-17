@@ -83,7 +83,13 @@ const AppLayout = () => {
             chat.selectedChannelRef.current = serverData.selectedChannel;
             unread.markChannelRead(serverData.selectedChannel.id);
             if (serverData.selectedChannel.type === 'voice') {
-                webrtc.connectToRoom(serverData.selectedChannel);
+                const userPerms = serverData.selectedServer?.my_permissions || 0;
+                const isOwner = serverData.selectedServer?.owner_id === authState.user?.id;
+                const isAdmin = (userPerms & 8) === 8;
+                const canSpeakPerm = (userPerms & 2048) === 2048;
+                const hasSpeak = isOwner || isAdmin || canSpeakPerm;
+                
+                webrtc.connectToRoom(serverData.selectedChannel, hasSpeak);
             } else {
                 chat.connectToChannel(serverData.selectedChannel);
                 chat.fetchChannelMessages(serverData.selectedChannel.id);
@@ -239,6 +245,7 @@ const AppLayout = () => {
                 onScreenShare={webrtc.startScreenShare}
                 stopScreenShare={webrtc.stopScreenShare}
                 isScreenSharing={webrtc.isScreenSharing}
+                canSpeak={webrtc.canSpeak}
                 handleServerSettings={() => setShowServerSettings(true)}
             >
                 <div onMouseDown={(e) => handleResizeStart(e, 'channel')} style={{ position: 'absolute', top: 0, right: -2, width: '4px', height: '100%', cursor: 'ew-resize', zIndex: 10 }} />

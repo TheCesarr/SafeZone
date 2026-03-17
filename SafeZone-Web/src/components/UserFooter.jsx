@@ -14,6 +14,7 @@ const UserFooter = ({
     authState,
     activeVoiceChannel,
     selectedServer,
+    canSpeak,
     isMuted,
     isDeafened,
     isNoiseCancelled,
@@ -87,9 +88,8 @@ const UserFooter = ({
     const mutedColor = colors?.textMuted || '#b9bbbe';
     const borderColor = colors?.border || 'rgba(255,255,255,0.1)';
 
-    // Permission Checks
-    const canSpeak = myPermissions !== undefined ? hasPermission(myPermissions, PERMISSIONS.SPEAK) : true;
-
+    // Permission Checks are now handled by the canSpeak prop passed from useWebRTC
+    
 
     return (
         <div style={{ padding: '12px', backgroundColor: bgColor, borderTop: `1px solid ${borderColor}`, position: 'relative', transition: 'background-color 0.3s' }}>
