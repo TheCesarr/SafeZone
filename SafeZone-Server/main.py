@@ -11,7 +11,7 @@ import datetime
 from routers import auth, server, channel, friends, chat, user, admin
 
 # App Init
-app = FastAPI(title="SafeZone Backend", version="1.0.2")
+app = FastAPI(title="SafeZone Backend", version="1.0.3")
 
 # Setup
 os.makedirs("uploads", exist_ok=True)
