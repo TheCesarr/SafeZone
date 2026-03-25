@@ -235,7 +235,7 @@ async def update_status(data: StatusUpdateParam):
         
         await broadcast_room_update()
         
-        return {\"status\": \"success\"}
+        return {"status": "success"}
     except Exception as e:
         return safe_error(e)
 
