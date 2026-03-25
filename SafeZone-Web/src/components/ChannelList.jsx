@@ -80,6 +80,7 @@ const ChannelList = ({
     voiceStates,
     // UserFooter props
     authState,
+    canSpeak,
     isMuted,
     isDeafened,
     isNoiseCancelled,
