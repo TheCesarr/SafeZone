@@ -2,10 +2,27 @@ import sqlite3
 import os
 import secrets
 import bcrypt
+from contextlib import contextmanager
 
 DB_NAME = "safezone.db"
 
 def get_db_connection():
+    """
+    Get a database connection with standard PRAGMA settings.
+    Can be used as a regular call or as a context manager:
+
+        # Traditional (still works):
+        conn = get_db_connection()
+        c = conn.cursor()
+        ...
+        conn.close()
+
+        # Context manager (recommended — auto-close on exception):
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            ...
+            # conn.close() is called automatically
+    """
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     # WAL mode: prevents "database is locked" errors under concurrent WebSocket writes
@@ -13,6 +30,29 @@ def get_db_connection():
     conn.execute("PRAGMA synchronous=NORMAL;")  # Safe performance boost with WAL
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
+
+
+@contextmanager
+def db_connection():
+    """
+    Context manager version of get_db_connection.
+    Automatically commits on success, rolls back on exception,
+    and always closes the connection.
+
+    Usage:
+        with db_connection() as conn:
+            c = conn.cursor()
+            c.execute(...)
+            conn.commit()
+    """
+    conn = get_db_connection()
+    try:
+        yield conn
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

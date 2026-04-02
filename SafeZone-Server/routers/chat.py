@@ -1138,97 +1138,17 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
             data_str = await websocket.receive_text()
             data = json.loads(data_str)
             
-            # HANDLE CHAT (NEW)
-            if data.get("type") == "chat":
-                 # --- SAVE TO DB ---
-                conn = get_db_connection()
-                c = conn.cursor()
-                # Use the authenticated user_id from the token check at connection start
-                c.execute("SELECT id, username FROM users WHERE username = ?", (user_id,))
-                user_row = c.fetchone()
-                if user_row:
-                    c.execute("SELECT server_id FROM channels WHERE id = ?", (room_id,))
-                    chan = c.fetchone()
-                    if chan and not check_permission(user_row['id'], chan['server_id'], PERM_SEND_MESSAGES):
-                        conn.close()
-                        await websocket.send_text(json.dumps({"type": "error", "message": "Mesaj göndermek için yetkiniz yok."}))
-                        continue
-                    
-                    if data.get('attachment_url'):
-                        if chan and not check_permission(user_row['id'], chan['server_id'], PERM_ATTACH_FILES):
-                            conn.close()
-                            continue
-                        
-                    c.execute('''INSERT INTO channel_messages 
-                                (channel_id, sender_id, content, attachment_url, attachment_type, attachment_name, reply_to_id) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                              (room_id, user_row['id'], data.get('text', ""), 
-                               data.get('attachment_url'), data.get('attachment_type'), data.get('attachment_name'),
-                               data.get('reply_to_id')))
-                    msg_id = c.lastrowid
-                    conn.commit()
-                    
-                    # Construct full message object for UI
-                    full_msg = {
-                        "type": "chat",
-                        "id": msg_id,
-                        "sender": user_row['username'],
-                        "text": data.get('text', ""),
-                        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                        "attachment_url": data.get('attachment_url'),
-                        "attachment_type": data.get('attachment_type'),
-                        "attachment_name": data.get('attachment_name'),
-                        "reply_to_id": data.get('reply_to_id'),
-                        "reactions": {},
-                        "is_pinned": False
-                    }
-                    
-                    # Try to fetch reply_to context if it exists
-                    if data.get('reply_to_id'):
-                        c.execute('''
-                            SELECT cm.id, cm.content, u.username as sender
-                            FROM channel_messages cm
-                            JOIN users u ON cm.sender_id = u.id
-                            WHERE cm.id = ?
-                        ''', (data.get('reply_to_id'),))
-                        reply_row = c.fetchone()
-                        if reply_row:
-                            full_msg["reply_to"] = {
-                                "id": reply_row['id'], 
-                                "sender": reply_row['sender'], 
-                                "text": reply_row['content'][:100]
-                            }
-                            
-                conn.close()
-                # ------------------
-                # Broadcast the full hydrated message
-                if user_row:
-                    await broadcast(room, json.dumps(full_msg))
-                else:
-                    await broadcast(room, json.dumps(data)) # Fallback
-                continue
+            msg_type = data.get("type")
 
-            # HANDLE TYPING
-            if data.get("type") == "typing":
-                await broadcast(room, json.dumps(data))
-                continue
-
-            # HANDLE USER STATE UPDATES
-            if data.get("type") == "user_state":
-                conn_info['is_muted'] = data.get("is_muted", False)
-                conn_info['is_deafened'] = data.get("is_deafened", False)
-                conn_info['is_screen_sharing'] = data.get("is_screen_sharing", False)
-                # Broadcast new state to everyone in room
-                await broadcast_user_list(room_id)
-                continue 
-            
-            # Broadcast other messages (ICE, Offer, Answer, Chat) to peers
-            for conn in room.active_connections:
-                if conn['ws'] != websocket:
-                    try:
-                        await conn['ws'].send_text(data_str)
-                    except:
-                        pass
+            if msg_type == "chat":
+                await _handle_chat_message(data, user_id, room_id, room, websocket)
+            elif msg_type == "typing":
+                await _handle_typing(data, room)
+            elif msg_type == "user_state":
+                await _handle_user_state(data, conn_info, room_id)
+            else:
+                # WebRTC signaling (ICE, Offer, Answer) — relay to peers
+                await _relay_to_peers(data_str, room, websocket)
             
     except WebSocketDisconnect:
         if conn_info in room.active_connections:
@@ -1250,3 +1170,97 @@ async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token:
 
         await broadcast_room_update()
         await broadcast_user_list(room_id)
+
+
+# ── Room Sub-Handlers ────────────────────────────────────────────────────────
+
+async def _handle_chat_message(data: dict, user_id: str, room_id: str, room, websocket):
+    """Save a chat message to DB and broadcast it to the room."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, username FROM users WHERE username = ?", (user_id,))
+    user_row = c.fetchone()
+    full_msg = None
+
+    if user_row:
+        c.execute("SELECT server_id FROM channels WHERE id = ?", (room_id,))
+        chan = c.fetchone()
+        if chan and not check_permission(user_row['id'], chan['server_id'], PERM_SEND_MESSAGES):
+            conn.close()
+            await websocket.send_text(json.dumps({"type": "error", "message": "Mesaj göndermek için yetkiniz yok."}))
+            return
+
+        if data.get('attachment_url'):
+            if chan and not check_permission(user_row['id'], chan['server_id'], PERM_ATTACH_FILES):
+                conn.close()
+                return
+
+        c.execute('''INSERT INTO channel_messages 
+                    (channel_id, sender_id, content, attachment_url, attachment_type, attachment_name, reply_to_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+                  (room_id, user_row['id'], data.get('text', ""), 
+                   data.get('attachment_url'), data.get('attachment_type'), data.get('attachment_name'),
+                   data.get('reply_to_id')))
+        msg_id = c.lastrowid
+        conn.commit()
+
+        full_msg = {
+            "type": "chat",
+            "id": msg_id,
+            "sender": user_row['username'],
+            "text": data.get('text', ""),
+            "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "attachment_url": data.get('attachment_url'),
+            "attachment_type": data.get('attachment_type'),
+            "attachment_name": data.get('attachment_name'),
+            "reply_to_id": data.get('reply_to_id'),
+            "reactions": {},
+            "is_pinned": False
+        }
+
+        # Fetch reply_to context
+        if data.get('reply_to_id'):
+            c.execute('''
+                SELECT cm.id, cm.content, u.username as sender
+                FROM channel_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE cm.id = ?
+            ''', (data.get('reply_to_id'),))
+            reply_row = c.fetchone()
+            if reply_row:
+                full_msg["reply_to"] = {
+                    "id": reply_row['id'], 
+                    "sender": reply_row['sender'], 
+                    "text": reply_row['content'][:100]
+                }
+
+    conn.close()
+
+    if full_msg:
+        await broadcast(room, json.dumps(full_msg))
+    else:
+        await broadcast(room, json.dumps(data))
+
+
+async def _handle_typing(data: dict, room):
+    """Broadcast a typing indicator to the room."""
+    await broadcast(room, json.dumps(data))
+
+
+async def _handle_user_state(data: dict, conn_info: dict, room_id: str):
+    """Update mute/deafen/screen-share state and notify room."""
+    conn_info['is_muted'] = data.get("is_muted", False)
+    conn_info['is_deafened'] = data.get("is_deafened", False)
+    conn_info['is_screen_sharing'] = data.get("is_screen_sharing", False)
+    await broadcast_user_list(room_id)
+
+
+async def _relay_to_peers(data_str: str, room, sender_ws):
+    """Relay WebRTC signaling messages (ICE, Offer, Answer) to peers."""
+    for conn in room.active_connections:
+        if conn['ws'] != sender_ws:
+            try:
+                await conn['ws'].send_text(data_str)
+            except Exception:
+                pass
+
