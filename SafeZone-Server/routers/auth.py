@@ -230,3 +230,77 @@ async def reset_password(data: UserReset):
         return safe_error(e, "reset")
 
 # (Duplicate /admin-login endpoint removed — the correct one is defined above at line 116)
+
+
+# ── WebSocket Ticket System ──────────────────────────────────────────────────
+# Instead of sending the user's persistent auth token in WebSocket URLs
+# (which appears in proxy logs, browser dev tools, and server logs),
+# the client first obtains a short-lived, single-use "ticket" via this
+# HTTP endpoint, then uses the ticket in the WS URL.
+#
+# Ticket properties:
+#   - 30 second TTL
+#   - Single use (consumed on first WS connect)
+#   - Cryptographically random (32 bytes)
+#
+# Fallback: WS endpoints still accept raw tokens for backward compatibility.
+
+import time as _time
+
+# In-memory ticket store: { ticket_string: { "username": ..., "expires": ... } }
+_ws_tickets: dict[str, dict] = {}
+_ticket_cleanup_counter = 0
+
+
+@router.post("/ws-ticket")
+async def get_ws_ticket(data: dict):
+    """
+    Exchange a persistent auth token for a short-lived WebSocket ticket.
+    The ticket can be used once in a WS URL within 30 seconds.
+    """
+    token = data.get("token")
+    if not token:
+        return {"status": "error", "message": "Token required"}
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT username FROM users WHERE token = ?", (token,))
+    user = c.fetchone()
+    conn.close()
+
+    if not user:
+        return {"status": "error", "message": "Invalid token"}
+
+    # Generate ticket
+    ticket = secrets.token_urlsafe(32)
+    _ws_tickets[ticket] = {
+        "username": user["username"],
+        "expires": _time.monotonic() + 30  # 30 second TTL
+    }
+
+    # Periodic cleanup of expired tickets
+    global _ticket_cleanup_counter
+    _ticket_cleanup_counter += 1
+    if _ticket_cleanup_counter >= 50:
+        _ticket_cleanup_counter = 0
+        now = _time.monotonic()
+        expired = [k for k, v in _ws_tickets.items() if v["expires"] < now]
+        for k in expired:
+            del _ws_tickets[k]
+
+    return {"status": "success", "ticket": ticket}
+
+
+def validate_ws_ticket(ticket: str) -> str | None:
+    """
+    Validate and consume a WS ticket.
+    Returns the username if valid, None otherwise.
+    Ticket is single-use: consumed on first call.
+    """
+    entry = _ws_tickets.pop(ticket, None)
+    if not entry:
+        return None
+    if _time.monotonic() > entry["expires"]:
+        return None  # Expired
+    return entry["username"]
+

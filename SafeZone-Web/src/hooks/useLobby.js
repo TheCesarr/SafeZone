@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getUrl } from '../utils/api';
+import { getUrl, getWsTicket } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 
 export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnreadDM, onOnlineUsersUpdate) => {
@@ -24,12 +24,13 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
     const shouldReconnect = useRef(true);
 
     // Connect
-    const connectToLobby = () => {
+    const connectToLobby = async () => {
         if (!authState.token || !authState.user?.username) return;
 
         if (lobbyWs.current) lobbyWs.current.close();
-        // Use username for Lobby ID so backend updates the correct user row
-        const wsUrl = getUrl(`/ws/lobby/${authState.user.username}?token=${encodeURIComponent(authState.token)}`, 'ws');
+        // Get short-lived ticket instead of sending persistent token in URL
+        const ticket = await getWsTicket(authState.token);
+        const wsUrl = getUrl(`/ws/lobby/${authState.user.username}?token=${encodeURIComponent(ticket)}`, 'ws');
         lobbyWs.current = new WebSocket(wsUrl);
 
         lobbyWs.current.onmessage = (event) => {

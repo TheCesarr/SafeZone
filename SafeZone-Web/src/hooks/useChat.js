@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getUrl } from '../utils/api';
+import { getUrl, getWsTicket } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 import toast from '../utils/toast';
 
@@ -43,7 +43,7 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
     const currentChannelId = useRef(null);
 
     // --- CONNECTION ---
-    const connectToChannel = (channel) => {
+    const connectToChannel = async (channel) => {
         if (!channel || channel.type === 'voice') return;
 
         // Immediately clear messages to prevent stale content from previous channel
@@ -52,7 +52,9 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
 
         if (chatWs.current) chatWs.current.close();
         const userId = authState.user?.username || uuid.current;
-        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(authState.token)}`, 'ws');
+        // Get short-lived ticket instead of sending persistent token in URL
+        const ticket = await getWsTicket(authState.token);
+        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(ticket)}`, 'ws');
         chatWs.current = new WebSocket(wsUrl);
 
         const connectedChannelId = channel.id; // capture at connection time

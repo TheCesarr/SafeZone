@@ -863,15 +863,26 @@ async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
 
 @router.websocket("/ws/lobby/{user_id}")
 async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(default=None)):
-    # --- AUTH: Validate token before accepting ---
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT username FROM users WHERE token = ?", (token,))
-    db_user = c.fetchone()
-    conn.close()
-    if not db_user or db_user['username'] != user_id:
+    # --- AUTH: Validate via ticket-first, then token fallback ---
+    from routers.auth import validate_ws_ticket
+    authenticated = False
+    # Try ticket auth first (secure: ticket doesn't expose persistent token)
+    if token:
+        ticket_user = validate_ws_ticket(token)
+        if ticket_user and ticket_user == user_id:
+            authenticated = True
+    # Fallback: raw token auth (backward compatibility)
+    if not authenticated and token:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE token = ?", (token,))
+        db_user = c.fetchone()
+        conn.close()
+        if db_user and db_user['username'] == user_id:
+            authenticated = True
+    if not authenticated:
         await websocket.close(code=4001)  # Unauthorized
-        log_event("SECURITY", f"WS Lobby rejected: claimed user_id={user_id}, token={token[:8] if token else 'None'}...")
+        log_event("SECURITY", f"WS Lobby rejected: claimed user_id={user_id}")
         return
     # Auth passed — accept connection
     await websocket.accept()
@@ -960,15 +971,24 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
 
 @router.websocket("/ws/room/{room_id}/{user_id}")
 async def room_endpoint(websocket: WebSocket, room_id: str, user_id: str, token: str = Query(default=None)):
-    # --- AUTH: Validate token before accepting ---
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT username FROM users WHERE token = ?", (token,))
-    db_user = c.fetchone()
-    conn.close()
-    if not db_user or db_user['username'] != user_id:
+    # --- AUTH: Validate via ticket-first, then token fallback ---
+    from routers.auth import validate_ws_ticket
+    authenticated = False
+    if token:
+        ticket_user = validate_ws_ticket(token)
+        if ticket_user and ticket_user == user_id:
+            authenticated = True
+    if not authenticated and token:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE token = ?", (token,))
+        db_user = c.fetchone()
+        conn.close()
+        if db_user and db_user['username'] == user_id:
+            authenticated = True
+    if not authenticated:
         await websocket.close(code=4001)  # Unauthorized
-        log_event("SECURITY", f"WS Room rejected: claimed user_id={user_id}, token={token[:8] if token else 'None'}...")
+        log_event("SECURITY", f"WS Room rejected: claimed user_id={user_id}")
         return
     # Auth passed — accept connection
     await websocket.accept()

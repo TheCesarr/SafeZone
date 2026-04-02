@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { getUrl, STUN_SERVERS } from '../utils/api';
+import { getUrl, getWsTicket, STUN_SERVERS } from '../utils/api';
 import SoundManager from '../utils/SoundManager';
 import toast from '../utils/toast';
 import { NoiseSuppression } from '../audio/NoiseSuppression';
@@ -130,7 +130,9 @@ export const useWebRTC = (authState, uuid, roomWs, onMessageReceived, selectedIn
         if (connectingRef.current !== channel.id) return;
 
         const userId = authState.user?.username || uuid.current;
-        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(authState.token)}`, 'ws');
+        // Get short-lived ticket instead of sending persistent token in URL
+        const ticket = await getWsTicket(authState.token);
+        const wsUrl = getUrl(`/ws/room/${channel.id}/${userId}?token=${encodeURIComponent(ticket)}`, 'ws');
         roomWs.current = new WebSocket(wsUrl);
 
         setVoiceStates({});

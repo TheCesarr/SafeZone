@@ -72,3 +72,26 @@ export const getUrl = (endpoint, protocol = 'http') => {
         return `${_useHttps ? 'https' : 'http'}://${base}${endpoint}`;
     }
 }
+
+/**
+ * Obtain a short-lived, single-use WebSocket ticket from the server.
+ * This avoids sending the persistent auth token in WebSocket URLs
+ * (which appear in proxy logs, browser DevTools, etc).
+ * Falls back to the raw token if ticket endpoint fails.
+ */
+export const getWsTicket = async (authToken) => {
+    try {
+        const res = await fetch(getUrl('/auth/ws-ticket'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: authToken })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.ticket) {
+            return data.ticket;
+        }
+    } catch (e) {
+        // Silent fallback to raw token
+    }
+    return authToken; // Fallback: use raw token (backward compat)
+}
