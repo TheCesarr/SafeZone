@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form
 from models import ServerCreate, ServerJoin, RoleCreate
 from database import get_db_connection
-from utils import log_event, check_permission, get_user_permissions, create_audit_log, PERM_MANAGE_ROLES, PERM_KICK_MEMBERS, PERM_BAN_MEMBERS, PERM_MANAGE_CHANNELS, PERM_MANAGE_SERVER, check_server_membership, validate_upload, ALLOWED_IMAGE_EXTS
+from utils import log_event, check_permission, get_user_permissions, create_audit_log, safe_error, PERM_MANAGE_ROLES, PERM_KICK_MEMBERS, PERM_BAN_MEMBERS, PERM_MANAGE_CHANNELS, PERM_MANAGE_SERVER, check_server_membership, validate_upload, ALLOWED_IMAGE_EXTS
 import uuid
 import secrets
 import sqlite3
@@ -313,7 +313,7 @@ async def leave_server(data: dict):
         conn.close()
         return {"status":"success"}
     except Exception as e:
-        return {"status":"error", "message":str(e)}
+        return safe_error(e, "leave_server")
 
 @router.post("/delete")
 async def delete_server(data: dict):
@@ -345,7 +345,7 @@ async def delete_server(data: dict):
         conn.close()
         return {"status":"success"}
     except Exception as e:
-        return {"status":"error", "message":str(e)}
+        return safe_error(e, "delete_server")
 
 # --- ROLE MANAGEMENT ENDPOINTS ---
 

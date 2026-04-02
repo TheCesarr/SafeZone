@@ -34,7 +34,6 @@ async def get_voice_log(channel_id: str, token: str, limit: int = 50):
         if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        conn.close()
         # 2. Authorization: must have VIEW_CHANNELS permission in that server
         c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
         channel = c.fetchone()
@@ -65,7 +64,6 @@ async def get_channel_messages(channel_id: str, token: str, before: int = None, 
         if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        conn.close()
         # 2. Authorization: must have VIEW_CHANNELS permission in that server
         c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
         channel = c.fetchone()
@@ -315,10 +313,7 @@ async def remove_reaction(message_id: int, token: str, emoji: str):
     except Exception as e:
         return safe_error(e)
 
-@router.get("/channel/{channel_id}/messages")
-async def get_channel_messages_redirect(channel_id: str, token: str, before: int = None, limit: int = 100):
-    """Alias — same as above"""
-    pass  # Already defined above
+# (Duplicate /channel/{channel_id}/messages route removed — already defined above at line 56)
 
 @router.post("/chat/upload")
 async def chat_upload(token: str = Form(...), file: UploadFile = File(...)):
@@ -527,6 +522,29 @@ async def link_preview(data: dict):
     if not url: return {"status": "error"}
     
     try:
+        # --- SSRF Protection: Block private/internal IPs and non-HTTP schemes ---
+        from urllib.parse import urlparse
+        import ipaddress
+        import socket
+
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return {"status": "error", "message": "Only HTTP(S) URLs are allowed."}
+        
+        hostname = parsed.hostname
+        if not hostname:
+            return {"status": "error", "message": "Invalid URL"}
+
+        # Resolve hostname to IP and check if it's a private/reserved address
+        try:
+            resolved_ip = socket.getaddrinfo(hostname, None, socket.AF_INET)[0][4][0]
+            ip_obj = ipaddress.ip_address(resolved_ip)
+            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_reserved or ip_obj.is_link_local:
+                return {"status": "error", "message": "Access to internal addresses is not allowed."}
+        except (socket.gaierror, ValueError):
+            return {"status": "error", "message": "Could not resolve hostname."}
+        # --- End SSRF Protection ---
+
         # Simple regex-based scraper (No external deps)
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; SafeZone/1.0)'})
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -534,7 +552,7 @@ async def link_preview(data: dict):
             if 'text/html' not in content_type:
                 return {"status": "error", "message": "Not HTML"}
                 
-            html = response.read().decode('utf-8', errors='ignore')
+            html = response.read(512_000).decode('utf-8', errors='ignore')  # Max 512KB
             
             title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
             title = title_match.group(1).strip() if title_match else url
@@ -780,7 +798,6 @@ async def get_pinned_messages(channel_id: str, token: str):
         if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        conn.close()
         # Authorization: must have VIEW_CHANNELS permission in that server
         c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
         channel = c.fetchone()
@@ -815,7 +832,6 @@ async def search_messages(channel_id: str, token: str, q: str, limit: int = 25):
         if not user:
             conn.close()
             return {"status": "error", "message": "Invalid token"}
-        conn.close()
         # Authorization: must have VIEW_CHANNELS permission in that server
         c.execute("SELECT server_id FROM channels WHERE id = ?", (channel_id,))
         channel = c.fetchone()
