@@ -36,9 +36,20 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'lobby_update') {
-                    console.log("[useLobby] Update:", data);
                     setTotalUsers(data.total_online);
-                    setRoomDetails(data.room_details || {});
+
+                    // Only trigger server refresh if room occupancy actually changed
+                    const newRoomDetails = data.room_details || {};
+                    setRoomDetails(prev => {
+                        const prevStr = JSON.stringify(prev);
+                        const newStr = JSON.stringify(newRoomDetails);
+                        if (prevStr !== newStr && fetchServers) {
+                            // Debounce: only fetch after brief settle
+                            clearTimeout(lobbyWs.current._serverRefreshTimer);
+                            lobbyWs.current._serverRefreshTimer = setTimeout(() => fetchServers(), 2000);
+                        }
+                        return prevStr !== newStr ? newRoomDetails : prev;
+                    });
 
                     // Parse Online Users
                     const ids = [];
@@ -57,9 +68,6 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
                     }
                     setOnlineUserIds(ids);
                     setUserStatuses(prev => ({ ...prev, ...statuses }));
-
-                    // Trigger server refresh to update channel user counts if needed
-                    if (fetchServers) fetchServers();
 
                 } else if (data.type === 'dm_received') {
                     if (selectedDM && selectedDM.username === data.sender) {

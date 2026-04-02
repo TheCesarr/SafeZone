@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query
 from database import get_db_connection, DB_NAME
 from utils import log_event, check_permission, create_audit_log, PERM_MANAGE_MESSAGES, PERM_VIEW_CHANNELS, PERM_SEND_MESSAGES, PERM_ATTACH_FILES, check_channel_membership, check_server_membership, validate_upload, ALLOWED_CHAT_EXTS, safe_error
-from state import lobby, rooms, VoiceRoom, broadcast_room_update, broadcast_user_list
+from state import lobby, rooms, VoiceRoom, broadcast_room_update, broadcast_user_list, cache_user_status, update_cached_status, remove_cached_user
 import sqlite3
 import json
 import uuid
@@ -887,7 +887,7 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
     lobby.active_connections[user_id] = websocket
     log_event("LOBBY", f"Lobby connection: {user_id}. Total: {len(lobby.active_connections)}")
 
-    # APPLY PREFERRED STATUS INSTEAD OF FORCE ONLINE
+    # APPLY PREFERRED STATUS + POPULATE CACHE
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -903,6 +903,8 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
             c.execute("UPDATE users SET status = ? WHERE username = ?", (new_status, user_id))
             conn.commit()
         conn.close()
+        # Populate in-memory cache from DB (one-time per connect)
+        cache_user_status(user_id)
     except Exception as e:
         log_event("ERROR", f"Status update error: {e}")
     
@@ -924,16 +926,17 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
                     new_status = msg.get('status')
                     if new_status in ['online', 'idle', 'dnd', 'invisible']:
                         target_status = 'offline' if new_status == 'invisible' else new_status
-                        # Update BOTH status and preferred_status to persist their choice
+                        # Update DB
                         conn = get_db_connection()
                         c = conn.cursor()
                         c.execute("UPDATE users SET status = ?, preferred_status = ? WHERE username = ?", 
                                  (target_status, new_status, user_id))
-                        # Also clear custom status if they switch back to 'online' (optional ux choice, but let's keep it simple for now and just update status)
                         conn.commit()
                         conn.close()
+                        # Update in-memory cache (no DB query on next broadcast)
+                        update_cached_status(user_id, target_status, new_status)
                         
-                        # Broadcast update
+                        # Broadcast update (debounced)
                         await broadcast_room_update()
                         
             except Exception as e:
@@ -942,7 +945,7 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
         if user_id in lobby.active_connections and lobby.active_connections[user_id] == websocket:
             del lobby.active_connections[user_id]
         
-        # SET OFFLINE
+        # SET OFFLINE + clear cache
         try:
             conn = get_db_connection()
             c = conn.cursor()
@@ -950,6 +953,7 @@ async def lobby_endpoint(websocket: WebSocket, user_id: str, token: str = Query(
             conn.commit()
             conn.close()
         except: pass
+        remove_cached_user(user_id)
 
         await broadcast_room_update()
 

@@ -99,6 +99,7 @@ def safe_error(e: Exception, context: str = "") -> dict:
 # --- RATE LIMITING (Brute Force Prevention) ---
 # In-memory store: {action_key: [timestamp, timestamp, ...]}
 _rate_store: dict[str, list[float]] = {}
+_rate_check_counter = 0  # Cleanup trigger counter
 
 def rate_limit_check(identifier: str, action: str, max_attempts: int = 10, window_seconds: int = 60) -> tuple[bool, str | None]:
     """
@@ -112,11 +113,12 @@ def rate_limit_check(identifier: str, action: str, max_attempts: int = 10, windo
         if not allowed:
             return {"status": "error", "message": err}
     """
+    global _rate_check_counter
     key = f"{action}:{identifier}"
     now = _time.monotonic()
     window_start = now - window_seconds
 
-    # Clean up old timestamps
+    # Clean up old timestamps for this key
     timestamps = _rate_store.get(key, [])
     timestamps = [t for t in timestamps if t > window_start]
 
@@ -126,6 +128,15 @@ def rate_limit_check(identifier: str, action: str, max_attempts: int = 10, windo
 
     timestamps.append(now)
     _rate_store[key] = timestamps
+
+    # Periodic global cleanup: every 100 checks, purge all expired entries
+    _rate_check_counter += 1
+    if _rate_check_counter >= 100:
+        _rate_check_counter = 0
+        expired_keys = [k for k, v in _rate_store.items() if not v or v[-1] < now - 600]
+        for k in expired_keys:
+            del _rate_store[k]
+
     return True, None
 
 
