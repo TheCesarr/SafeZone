@@ -80,7 +80,7 @@ const AppLayout = () => {
     // --- Channel selection effect ---
     useEffect(() => {
         if (serverData.selectedChannel) {
-            chat.selectedChannelRef.current = serverData.selectedChannel;
+            // Note: currentChannelId is set inside connectToChannel/fetchChannelMessages (single source of truth)
             unread.markChannelRead(serverData.selectedChannel.id);
             if (serverData.selectedChannel.type === 'voice') {
                 const userPerms = serverData.selectedServer?.my_permissions || 0;

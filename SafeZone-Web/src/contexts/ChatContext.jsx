@@ -17,7 +17,6 @@ export const ChatProvider = ({ children }) => {
     const { selectedChannel } = useServerContext();
 
     const uuid = useRef(localStorage.getItem('safezone_uuid') || uuidv4());
-    const selectedChannelRef = useRef(null);
 
     const chat = useChat(
         authState,
@@ -25,19 +24,18 @@ export const ChatProvider = ({ children }) => {
         chatWsRef,
         roomWsRef,
         () => {
-            if (selectedChannelRef.current) {
-                unread.incrementChannelUnread(selectedChannelRef.current.id);
+            // Use the single source of truth: currentChannelId from useChat
+            if (chat.currentChannelId?.current) {
+                unread.incrementChannelUnread(chat.currentChannelId.current);
             }
         }
     );
 
-    // Keep selectedChannelRef in sync
-    if (selectedChannel) selectedChannelRef.current = selectedChannel;
-
     const value = {
         ...chat,
         uuid,
-        selectedChannelRef,
+        // Expose currentChannelId as selectedChannelRef for backward compat
+        selectedChannelRef: chat.currentChannelId,
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

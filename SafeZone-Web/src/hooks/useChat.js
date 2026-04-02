@@ -301,6 +301,9 @@ export const useChat = (authState, uuid, chatWs, roomWs, onUnreadMessage) => {
         isLoadingMore,
         loadMoreMessages,
 
+        // Channel tracking (single source of truth)
+        currentChannelId,
+
         connectToChannel,
         fetchChannelMessages,
         handleIncomingMessage,

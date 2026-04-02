@@ -132,6 +132,8 @@ export const useLobby = (authState, uuid, fetchServers, onFriendRequest, onUnrea
         lobbyWs.current.onopen = () => {
             console.log('[useLobby] Connected to Lobby WS.');
             reconnectDelay.current = 1000; // Reset delay on successful connection
+            // Initial server list load on first connect
+            if (fetchServers) fetchServers();
         };
     }
 
